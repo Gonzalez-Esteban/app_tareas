@@ -8,37 +8,79 @@ export default function Home({ usuario }) {
 
   return (
     <div style={{ minHeight: '100vh', backgroundColor: '#2d3748', color: 'white' }}>
-      {/* Navbar Bootstrap oscuro */}
-      <nav className="navbar navbar-expand-lg navbar-dark bg-dark px-4">
-        <span className="navbar-brand">
-          Bienvenido, {usuario?.Nombre || usuario?.Legajo}!
-        </span>
+      {/* Navbar con Offcanvas */}
+      <nav className="navbar navbar-dark bg-dark fixed-top">
+        <div className="container-fluid d-flex justify-content-between align-items-center">
+          <span className="navbar-brand mb-0 h1">
+            Bienvenido, {usuario?.Nombre || usuario?.Legajo}!
+          </span>
 
-        <div className="collapse navbar-collapse">
-          <ul className="navbar-nav ms-auto">
-            <li className="nav-item">
-              <Link className="nav-link" to="/pedidos">Pedidos</Link>
-            </li>
-            <li className="nav-item">
-              <Link className="nav-link" to="/proyectos">Proyectos</Link>
-            </li>
-            <li className="nav-item">
+          <div className="d-flex align-items-center gap-2">
+            {/* Nuevo Pedido fuera del Offcanvas */}
+            <Link to="/nuevo-pedido" className="btn btn-outline-light">
+              <i className="bi bi-plus-circle me-2"></i>Pedido
+            </Link>
+
+            {/* Botón de menú Offcanvas */}
+            <button
+              className="navbar-toggler"
+              type="button"
+              data-bs-toggle="offcanvas"
+              data-bs-target="#offcanvasNavbar"
+              aria-controls="offcanvasNavbar"
+            >
+              <span className="navbar-toggler-icon"></span>
+            </button>
+          </div>
+
+          {/* Offcanvas */}
+          <div
+            className="offcanvas offcanvas-end text-bg-dark"
+            tabIndex="-1"
+            id="offcanvasNavbar"
+            aria-labelledby="offcanvasNavbarLabel"
+          >
+            <div className="offcanvas-header">
+              <h5 className="offcanvas-title" id="offcanvasNavbarLabel">Menú</h5>
               <button
-                className="nav-link btn btn-link text-danger"
-                style={{ textDecoration: 'none' }}
-                onClick={handleLogout}
-              >
-                Cerrar sesión
-              </button>
-            </li>
-          </ul>
+                type="button"
+                className="btn-close btn-close-white"
+                data-bs-dismiss="offcanvas"
+                aria-label="Close"
+              ></button>
+            </div>
+
+            <div className="offcanvas-body d-flex flex-column justify-content-between">
+              <ul className="navbar-nav flex-grow-1">
+                <li className="nav-item">
+                  <Link className="nav-link text-white" to="/pedidos">
+                    <i className="bi bi-card-checklist me-2"></i>Pedidos
+                  </Link>
+                </li>
+                <li className="nav-item">
+                  <Link className="nav-link text-white" to="/proyectos">
+                    <i className="bi bi-kanban me-2"></i>Proyectos
+                  </Link>
+                </li>
+              </ul>
+
+              <div className="mt-auto">
+                <button
+                  className="btn btn-link text-danger"
+                  onClick={handleLogout}
+                >
+                  <i className="bi bi-box-arrow-right me-2"></i>Cerrar sesión
+                </button>
+              </div>
+            </div>
+          </div>
         </div>
       </nav>
 
       {/* Contenido principal */}
-      <div className="container py-5">
-        <h2 className="text-white">Esta es tu página de inicio</h2>
-        {/* Agregá más contenido acá */}
+      <div style={{ paddingTop: '80px' }} className="container">
+        <h2 className="text-white mb-4">Panel de navegación</h2>
+        <p className="text-white">Seleccioná una opción del menú lateral.</p>
       </div>
     </div>
   );
