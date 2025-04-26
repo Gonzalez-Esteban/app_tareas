@@ -1,0 +1,2 @@
+Cambiar la url para el loguin en la BD una vez que se haga el despliegue en la siguiente direccion:
+https://supabase.com/dashboard/project/tywlhxexsynlevxeratm/auth/url-configuration
