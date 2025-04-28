@@ -1,8 +1,9 @@
 import { useEffect, useState } from 'react';
 import { supabase } from '../supabase/supabaseClient';
 import { useNavigate } from 'react-router-dom';
+import { toast } from 'react-toastify';
 
-function NuevoPedido() {
+function NuevoPedido({ pedidoEditando, onGuardar, onCancelar }) {
   const [pedido, setPedido] = useState({
     fecha: '',
     hora: '',
@@ -10,7 +11,7 @@ function NuevoPedido() {
     solicito: '',
     sector_id: '',
   });
-  const [sectores, setSectores] = useState([]); // ← ESTO ES LO QUE FALTABA
+  const [sectores, setSectores] = useState([]);
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -18,18 +19,32 @@ function NuevoPedido() {
       try {
         // Traer sectores
         const { data: sectoresData, error: errorSectores } = await supabase.from('sectores').select('*');
-        //console.log('Sectores recibidos:', sectoresData); // ← AQUI EL LOG
         if (errorSectores) {
           console.error('Error al traer sectores:', errorSectores.message);
         } else {
           setSectores(sectoresData || []);
         }
 
-        // Inicializar fecha y hora actuales
-        const now = new Date();
-        const fecha = now.toISOString().slice(0, 10);
-        const hora = now.toTimeString().slice(0, 5);
-        setPedido((prev) => ({ ...prev, fecha, hora }));
+        // Inicializar con datos de edición o valores por defecto
+        if (pedidoEditando) {
+          // Parsear fecha y hora del pedido existente
+          const fecha = pedidoEditando.created_at?.slice(0, 10) || new Date().toISOString().slice(0, 10);
+          const hora = pedidoEditando.created_at?.slice(11, 16) || new Date().toTimeString().slice(0, 5);
+          
+          setPedido({
+            fecha,
+            hora,
+            problema: pedidoEditando.problema || '',
+            solicito: pedidoEditando.solicito || '',
+            sector_id: pedidoEditando.sector_id || '',
+          });
+        } else {
+          // Valores por defecto para nuevo pedido
+          const now = new Date();
+          const fecha = now.toISOString().slice(0, 10);
+          const hora = now.toTimeString().slice(0, 5);
+          setPedido(prev => ({ ...prev, fecha, hora }));
+        }
 
       } catch (error) {
         console.error('Error general en fetchData:', error);
@@ -37,50 +52,66 @@ function NuevoPedido() {
     };
 
     fetchData();
-  }, []);
+  }, [pedidoEditando]);
 
   const handleChange = (e) => {
     const { name, value } = e.target;
-    setPedido((prev) => ({ ...prev, [name]: value }));
+    setPedido(prev => ({ ...prev, [name]: value }));
   };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
 
-    const {
-      data: { user },
-      error: authError,
-    } = await supabase.auth.getUser();
+    try {
+      const { data: { user }, error: authError } = await supabase.auth.getUser();
+      if (authError || !user) {
+        //alert('Usuario no autenticado');
+        toast.error('Usuario no autenticado');
+        return;
+      }
 
-    if (authError || !user) {
-      alert('Usuario no autenticado');
-      return;
-    }
-
-    const { fecha, hora, problema, solicito, sector_id } = pedido;
-
-    const { error } = await supabase.from('pedidos').insert([
-      {
+      const { fecha, hora, problema, solicito, sector_id } = pedido;
+      const pedidoData = {
         created_at: `${fecha}T${hora}`,
         problema,
         solicito,
-        sector_id: parseInt(sector_id), // ← Importante parsear sector_id
-        estado: 'En proceso',
+        sector_id: parseInt(sector_id),
         id_uuid: user.id,
-      },
-    ]);
+      };
 
-    if (error) {
-      alert('Error al guardar pedido: ' + error.message);
-    } else {
-      alert('Pedido guardado correctamente');
-      navigate('/home');
+      if (pedidoEditando) {
+        // Actualizar pedido existente
+        const { error } = await supabase
+          .from('pedidos')
+          .update(pedidoData)
+          .eq('id', pedidoEditando.id);
+
+        if (error) throw error;
+        //alert('Pedido actualizado correctamente');
+        toast.error("Error al guardar el pedido");
+      } else {
+        // Crear nuevo pedido
+        pedidoData.estado = 'En proceso';
+        const { error } = await supabase.from('pedidos').insert([pedidoData]);
+        if (error) throw error;
+        toast.success('Pedido guardado correctamente');
+      }
+
+      if (onGuardar) {
+        onGuardar();
+      } else {
+        navigate('/home');
+      }
+
+    } catch (error) {
+      console.error('Error al guardar pedido:', error);
+      alert(`Error al ${pedidoEditando ? 'actualizar' : 'guardar'} pedido: ${error.message}`);
     }
   };
 
   return (
     <div className="container mt-4">
-      <h2>Nuevo Pedido</h2>
+      <h2>{pedidoEditando ? 'Editar Pedido' : 'Nuevo Pedido'}</h2>
       <form onSubmit={handleSubmit}>
         <div className="mb-3">
           <label className="form-label">Fecha</label>
@@ -136,14 +167,25 @@ function NuevoPedido() {
             required
           >
             <option value="">Seleccione un sector</option>
-            {sectores.map((sector) => (
+            {sectores.map(sector => (
               <option key={sector.id} value={sector.id}>
                 {sector.nombre}
               </option>
             ))}
           </select>
         </div>
-        <button type="submit" className="btn btn-primary">Guardar</button>
+        <div className="d-flex justify-content-between">
+          <button 
+            type="button" 
+            className="btn btn-secondary"
+            onClick={onCancelar || (() => navigate('/home'))}
+          >
+            Cancelar
+          </button>
+          <button type="submit" className="btn btn-primary">
+            {pedidoEditando ? 'Actualizar' : 'Guardar'}
+          </button>
+        </div>
       </form>
     </div>
   );
