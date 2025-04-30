@@ -81,7 +81,7 @@ const TarjetaPedidos = ({
               style={{ backgroundColor: "transparent", border: "2px solid white", color: "white" }}
               onClick={() => agregarTarea(pedido.id)} // Esta función debe venir de Home.jsx
             >
-              <i className="bi bi-check-lg"></i>
+              <i className="bi bi-plus-lg"></i>
             </button>
           </div>
           </div>

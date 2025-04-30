@@ -1,4 +1,3 @@
-// src/App.jsx
 import { useState } from 'react';
 import { Routes, Route, useNavigate } from 'react-router-dom';
 import { ToastContainer } from 'react-toastify';
@@ -6,7 +5,6 @@ import 'react-toastify/dist/ReactToastify.css';
 import Login from './components/Login';
 import Registro from './components/Registro';
 import Home from './pages/Home';
-import NuevoPedido from './components/NuevoPedido';
 import 'bootstrap/dist/css/bootstrap.min.css';
 
 function App() {
@@ -52,7 +50,6 @@ function App() {
           path="/home" 
           element={usuario ? (<Home usuario={usuario} />) : (<Login onLogin={handleLogin} />)} 
         />
-        <Route path="/nuevo-pedido" element={<NuevoPedido />} />
       </Routes>
     </>
   );

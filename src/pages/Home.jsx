@@ -8,9 +8,8 @@ import duration from 'dayjs/plugin/duration';
 import relativeTime from 'dayjs/plugin/relativeTime';
 import 'dayjs/locale/es';
 import TarjetaPedidos from "../components/TarjetaPedidos";
-import ModalPedidos from "../components/ModalPedidos";
-import NuevoPedido from "../components/NuevoPedido";
 import ModalTareas from '../components/ModalTareas';
+import Pedidos from '../components/Pedidos';
 
 // Configuración de dayjs
 dayjs.extend(duration);
@@ -30,6 +29,7 @@ export default function Home({ usuario }) {
   const [mostrarModalTareas, setMostrarModalTareas] = useState(false);
   const [pedidoSeleccionado, setPedidoSeleccionado] = useState(null);
   const [modalAbierto, setModalAbierto] = useState(false);
+  const [showPedidosModal, setShowPedidosModal] = useState(false); // Nuevo estado
 
 
   useEffect(() => {
@@ -84,62 +84,6 @@ export default function Home({ usuario }) {
     setPedidos(data || []); // Manejar caso undefined
   };
 
-  const abrirModalEdicion = (pedido) => {
-    setPedidoEditando(pedido);
-    const modalElement = document.getElementById("nuevoPedidoModal");
-    if (modalElement) {
-      const modal = new bootstrap.Modal(modalElement);
-      modal.show();
-    }
-  };
-
-  const guardarPedido = async () => {
-    const sector_id = document.getElementById("sector")?.value;
-    const problema = document.getElementById("problema")?.value;
-    const hora = document.getElementById("hora")?.value;
-
-    if (!sector_id || !problema) {
-      alert("Completa todos los campos antes de guardar.");
-      return;
-    }
-
-    if (pedidoEditando) {
-      const { error } = await supabase
-        .from("pedidos")
-        .update({ sector_id, problema, hora })
-        .eq("id", pedidoEditando.id);
-
-      if (error) {
-        console.error("Error al actualizar pedido:", error.message);
-        alert("Error al actualizar el pedido.");
-      } else {
-        alert("Pedido actualizado con éxito.");
-        cerrarModal();
-        await cargarPedidos();
-      }
-    } else {
-      const { error } = await supabase.from("pedidos").insert([
-        { sector_id, problema, hora, id_uuid: usuario.id }
-      ]);
-
-      if (error) {
-        console.error("Error al guardar pedido:", error.message);
-        alert("Error al guardar el pedido.");
-      } else {
-        alert("Pedido guardado con éxito.");
-        cerrarModal();
-        await cargarPedidos();
-      }
-    }
-  };
-
-  const cerrarModal = () => {
-    const modalElement = document.getElementById("nuevoPedidoModal");
-    const modal = bootstrap.Modal.getInstance(modalElement);
-    modal?.hide();
-    setPedidoEditando(null);
-    setModalAbierto(false);
-  };
 
   const borrarPedido = async (id) => {
     if (!window.confirm("¿Estás seguro de borrar este pedido?")) return;
@@ -189,7 +133,7 @@ export default function Home({ usuario }) {
       const diffEnHoras = Math.abs(ahora.diff(creacion, 'hour'));
       const diffEnDias = Math.abs(ahora.diff(creacion, 'day'));
 
-      if (diffEnMinutos < 1) return "Hace unos segundos";
+      if (diffEnMinutos <= 1) return "Hace unos segundos";
       
       const dias = diffEnDias;
       const horas = diffEnHoras - 3 - (24 * dias);
@@ -206,6 +150,23 @@ export default function Home({ usuario }) {
     }
   };
 
+
+    // Modificar las funciones relacionadas
+    const abrirModalEdicion = (pedido) => {
+      setPedidoEditando(pedido);
+      setShowPedidosModal(true);
+    };
+  
+    const abrirNuevoPedido = () => {
+      setPedidoEditando(null);
+      setShowPedidosModal(true);
+    };
+  
+    const cerrarModal = () => {
+      setShowPedidosModal(false);
+      setPedidoEditando(null);
+    };
+  
   return (
     <div style={{ minHeight: "100vh", backgroundColor: "#2d3748", color: "white" }}>
       {/* Navbar */}
@@ -218,8 +179,7 @@ export default function Home({ usuario }) {
           <div className="d-flex align-items-center gap-2">
             <button
               className="btn btn-outline-light ms-2"
-              data-bs-toggle="modal"
-              data-bs-target="#nuevoPedidoModal"
+              onClick={abrirNuevoPedido}
             >
               <i className="bi bi-plus-circle me-1"></i> Nuevo Pedido
             </button>
@@ -262,13 +222,17 @@ export default function Home({ usuario }) {
 
       {/* Contenido principal */}
       <div style={{ paddingTop: "80px" }} className="container">
-        <ModalPedidos
-          pedidoEditando={pedidoEditando}
-          cerrarModal={cerrarModal}
-          sectores={sectores}
-          horaActual={horaActual}
-          guardarPedido={guardarPedido}
-        />
+      <Pedidos
+    showModal={showPedidosModal} // Pasar la prop
+    pedidoEditando={pedidoEditando}
+    onClose={cerrarModal}
+    sectores={sectores}
+    usuario={usuario}
+    onGuardarSuccess={() => {
+      cargarPedidos();
+      cerrarModal();
+    }}
+  />
 
         {/* Tarjetas de pedidos */}
         <div className="row mt-4">
