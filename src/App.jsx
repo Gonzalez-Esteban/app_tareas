@@ -7,6 +7,7 @@ import Registro from './components/Registro';
 import Home from './pages/Home';
 import 'bootstrap/dist/css/bootstrap.min.css';
 
+
 function App() {
   const [usuario, setUsuario] = useState(() => {
     const saved = localStorage.getItem('usuario');
@@ -28,19 +29,20 @@ function App() {
 
   return (
     <>
+    
       {/* Contenedor de notificaciones - debe estar en el nivel superior */}
       <ToastContainer 
-        position="top-right"
-        autoClose={3000}
-        hideProgressBar={false}
-        newestOnTop={false}
-        closeOnClick
-        rtl={false}
-        pauseOnFocusLoss
-        draggable
-        pauseOnHover
-        theme="colored"
-      />
+    position="top-right"
+    autoClose={5000}
+    hideProgressBar={false}
+    newestOnTop={false}
+    closeOnClick
+    rtl={false}
+    pauseOnFocusLoss
+    draggable
+    pauseOnHover
+    theme="colored"
+  />
       
       {/* Rutas de tu aplicación */}
       <Routes>

@@ -1,163 +1,368 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { supabase } from '../supabase/supabaseClient';
+import { toast } from 'react-toastify';
+import dayjs from 'dayjs';
+import duration from 'dayjs/plugin/duration';
+import 'bootstrap/dist/css/bootstrap.min.css';
+
+dayjs.extend(duration);
 
 const ModalTareas = ({ 
+  showModal,
   pedido, 
-  onClose,
-  usuario
+  tarea: tareaExistente, 
+  onClose, 
+  onTareaGuardada,
+  cambiarEstadoPedido 
 }) => {
-  const [tareas, setTareas] = useState([]);
-  const [nuevaTarea, setNuevaTarea] = useState({
-    descripcion: '',
-    completada: false
-  });
+  const [descripcion, setDescripcion] = useState('');
+  const [numeroPuesto, setNumeroPuesto] = useState('');
+  const [abreviaturaSector, setAbreviaturaSector] = useState('');
+  const [tiempoTranscurrido, setTiempoTranscurrido] = useState('');
+  const [sectores, setSectores] = useState([]);
+  const [cargandoSectores, setCargandoSectores] = useState(true);
+  const modalRef = useRef(null);
+  const modalInstance = useRef(null);
 
-  // Cargar tareas existentes
+  // Obtener sectores con sus abreviaturas al cargar el componente
   useEffect(() => {
-    const cargarTareas = async () => {
-      if (!pedido?.id) return;
-      
-      const { data, error } = await supabase
-        .from('tareas')
-        .select('*')
-        .eq('id', pedido.id);
-      
-      if (error) {
-        console.error('Error cargando tareas:', error);
-      } else {
-        setTareas(data || []);
+    const obtenerSectores = async () => {
+      try {
+        const { data, error } = await supabase
+          .from('sectores')
+          .select('id, nombre, abrev');
+        
+        if (error) throw error;
+        
+        setSectores(data || []);
+      } catch (error) {
+        console.error("Error obteniendo sectores:", error);
+        toast.error("Error al cargar sectores");
+      } finally {
+        setCargandoSectores(false);
       }
     };
     
-    cargarTareas();
-  }, [pedido]);
+    obtenerSectores();
+  }, []);
 
-  const handleInputChange = (e) => {
-    const { name, value } = e.target;
-    setNuevaTarea(prev => ({
-      ...prev,
-      [name]: value
-    }));
+  // Función para obtener abreviatura del sector desde el pedido
+  const obtenerAbreviaturaSector = () => {
+    if (!pedido?.sector_id || cargandoSectores) return 'GEN';
+    
+    const sectorEncontrado = sectores.find(s => s.id === pedido.sector_id);
+    return sectorEncontrado?.abrev || 'GEN';
   };
 
-  const agregarTarea = async () => {
-    if (!nuevaTarea.descripcion.trim()) return;
-    
-    const { data, error } = await supabase
-      .from('tareas')
-      .insert([{
-        descripcion: nuevaTarea.descripcion,
-        id_pedido: pedido.id,
-        id_uuid: usuario.id,
-        completada: false
-      }]);
-    
-    if (error) {
-      console.error('Error agregando tarea:', error);
+  // Inicialización del modal y datos del puesto
+  useEffect(() => {
+    if (!modalRef.current) return;
+
+    if (!modalInstance.current) {
+      modalInstance.current = new bootstrap.Modal(modalRef.current, {
+        backdrop: 'static'
+      });
+    }
+
+    if (showModal) {
+      modalInstance.current.show();
+      // Inicializar datos cuando se muestra el modal
+      inicializarDatos();
     } else {
-      setTareas(prev => [...prev, ...data]);
-      setNuevaTarea({ descripcion: '', completada: false });
+      modalInstance.current.hide();
+      cleanUpModal();
+    }
+  }, [showModal]);
+
+  const inicializarDatos = async () => {
+    try {
+      // Inicializar descripción
+      if (tareaExistente) {
+        setDescripcion(tareaExistente.descripcion);
+      } else {
+        setDescripcion('');
+        const tiempoCalculado = await calcularTiempoDesdeUltimaTarea();
+        setTiempoTranscurrido(tiempoCalculado);
+      }
+
+      // Inicializar datos del puesto
+      const abreviatura = obtenerAbreviaturaSector();
+      setAbreviaturaSector(abreviatura);
+
+      // Si el pedido ya tiene puesto, extraer el número
+      if (pedido?.puesto) {
+        const partes = pedido.puesto.split('-');
+        if (partes.length > 1) {
+          setNumeroPuesto(partes[1]);
+        } else {
+          setNumeroPuesto('');
+        }
+      } else {
+        setNumeroPuesto('');
+      }
+    } catch (error) {
+      console.error("Error inicializando datos:", error);
+      setTiempoTranscurrido('0m');
     }
   };
 
-  const toggleCompletada = async (tareaId, estadoActual) => {
-    const { error } = await supabase
-      .from('tareas')
-      .update({ completada: !estadoActual })
-      .eq('id', tareaId);
+  const cleanUpModal = () => {
+    const backdrops = document.getElementsByClassName('modal-backdrop');
+    Array.from(backdrops).forEach(backdrop => backdrop.remove());
+    document.body.style.overflow = 'auto';
+    document.body.style.paddingRight = '0';
+    document.body.classList.remove('modal-open');
+  };
+
+  const calcularTiempoDesdeUltimaTarea = async () => {
+    if (!pedido?.id) return "0m";
     
-    if (error) {
-      console.error('Error actualizando tarea:', error);
-    } else {
-      setTareas(prev => prev.map(t => 
-        t.id === tareaId ? { ...t, completada: !estadoActual } : t
-      ));
+    try {
+      const { data: tareas } = await supabase
+        .from('tareas')
+        .select('transcurrido')
+        .eq('id_pedido', pedido.id)
+        .order('transcurrido', { ascending: false });
+  
+      let referencia;
+      
+      if (tareas && tareas.length > 0) {
+        referencia = tareas[0].transcurrido;
+      } else {
+        referencia = pedido.created_at;
+      }
+  
+      const ahora = dayjs();
+      const creacion = dayjs(referencia);
+      if (!creacion.isValid()) return "0m";
+      
+      const diff = dayjs.duration(ahora.diff(creacion));
+      
+      if (diff.asDays() >= 1) return `${Math.floor(diff.asDays())}d`;
+      if (diff.asHours() >= 1) return `${Math.floor(diff.asHours())}h`;
+      return `${Math.floor(diff.asMinutes())}m`;
+    } catch (error) {
+      console.error('Error calculando tiempo:', error);
+      return '0m';
+    }
+  };
+  
+  const handleClose = () => {
+    if (document.activeElement) {
+      document.activeElement.blur();
+    }
+  
+    if (modalInstance.current) {
+      modalInstance.current.hide();
+    }
+    cleanUpModal();
+    onClose();
+  };
+
+  const guardarTarea = async (estado) => {
+    if (!descripcion.trim()) {
+      toast.error('La descripción no puede estar vacía');
+      return;
+    }
+
+    if (numeroPuesto && !/^\d{1,2}$/.test(numeroPuesto)) {
+      toast.error('El número de puesto debe tener máximo 2 cifras');
+      return;
+    }
+  
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error('No autenticado');
+
+      // Crear valor de puesto completo (ej: "SOP-12")
+      const puestoCompleto = `${abreviaturaSector}${numeroPuesto ? `-${numeroPuesto}` : ''}`;
+  
+      // 1. Actualizar el pedido con el puesto y estado
+      if (pedido?.id) {
+        const { error: errorPedido } = await supabase
+          .from('pedidos')
+          .update({ 
+            puesto: puestoCompleto,
+            estado
+          })
+          .eq('id', pedido.id);
+        
+        if (errorPedido) throw errorPedido;
+      }
+
+      // 2. Guardar/actualizar la tarea
+      const ahora = new Date().toISOString();
+      const tareaData = {
+        descripcion,
+        completada: estado === 'Resuelto'
+      };
+
+      if (tareaExistente) {
+        const { error } = await supabase
+          .from('tareas')
+          .update(tareaData)
+          .eq('id', tareaExistente.id);
+  
+        if (error) throw error;
+        toast.success('Tarea actualizada');
+      } else {
+        tareaData.id_pedido = pedido.id;
+        tareaData.id_uuid = user.id;
+        tareaData.transcurrido = ahora;
+        tareaData.tiempo_desde_ultimo = tiempoTranscurrido || '0m';
+        
+        const { error } = await supabase
+          .from('tareas')
+          .insert(tareaData);
+  
+        if (error) throw error;
+        toast.success('Tarea agregada');
+      }
+  
+      onTareaGuardada();
+      handleClose();
+    } catch (error) {
+      console.error('Error al guardar tarea:', error);
+      toast.error(error.message || 'Error al guardar tarea');
+    }
+  };
+
+  const eliminarTarea = async () => {
+    if (!window.confirm('¿Estás seguro de eliminar esta tarea?')) return;
+
+    try {
+      const { error } = await supabase
+        .from('tareas')
+        .delete()
+        .eq('id', tareaExistente.id);
+
+      if (error) throw error;
+
+      toast.success('Tarea eliminada');
+      onTareaGuardada();
+      handleClose();
+    } catch (error) {
+      console.error('Error al eliminar tarea:', error);
+      toast.error('Error al eliminar tarea');
     }
   };
 
   return (
-    <div className="modal fade" id="modalTareas" tabIndex="-1">
-      <div className="modal-dialog modal-lg">
+    <div 
+      ref={modalRef}
+      className="modal fade" 
+      id="modalTareas"
+      tabIndex="-1"
+      aria-labelledby="modalTareasTitle"
+      aria-hidden="true"
+    >
+      <div className="modal-dialog">
         <div className="modal-content bg-dark text-white">
           <div className="modal-header">
-            <h5 className="modal-title">
-              Tareas realizada: {pedido?.problema || ''}
+            <h5 className="modal-title" id="modalTareasTitle">
+              {tareaExistente ? "Editar Tarea" : "Agregar Tarea"} - {pedido?.problema || ''}
             </h5>
             <button 
+              type="button"
               className="btn-close btn-close-white" 
-              data-bs-dismiss="modal"
-              onClick={onClose}
+              onClick={handleClose}
+              aria-label="Cerrar"
             ></button>
           </div>
-          
           <div className="modal-body">
-            <div className="mb-4">
-              <h6>Agregar nueva tarea:</h6>
-              <div className="input-group">
-                <input
-                  type="text"
-                  className="form-control bg-secondary text-white border-dark"
-                  placeholder="Descripción de la tarea"
-                  name="descripcion"
-                  value={nuevaTarea.descripcion}
-                  onChange={handleInputChange}
-                />
-                <button 
-                  className="btn btn-primary"
-                  onClick={agregarTarea}
+            <div className="mb-3">
+              {/* Sección de Puesto */}
+              <div className="d-flex align-items-center mb-3">
+                <label className="me-2">Puesto:</label>
+                {cargandoSectores ? (
+                  <div className="spinner-border spinner-border-sm text-secondary" role="status">
+                    <span className="visually-hidden">Cargando...</span>
+                  </div>
+                ) : (
+                  <>
+                    <span 
+                      className="badge bg-secondary d-flex align-items-center justify-content-center" 
+                      style={{
+                        width: '45px',
+                        height: '38px',
+                        fontSize: '1rem'
+                      }}
+                    >
+                      {abreviaturaSector}
+                    </span>
+                    <input
+                      type="text"
+                      className="form-control bg-secondary text-white border-dark ms-2"
+                      style={{
+                        width: '45px',
+                        height: '38px',
+                        textAlign: 'center',
+                        fontSize: '1rem'
+                      }}
+                      placeholder="N°"
+                      value={numeroPuesto}
+                      onChange={(e) => {
+                        if (e.target.value === '' || /^\d{0,2}$/.test(e.target.value)) {
+                          setNumeroPuesto(e.target.value);
+                        }
+                      }}
+                      maxLength={2}
+                    />
+                  </>
+                )}
+              </div>
+
+              {/* Textarea de descripción */}
+              <textarea
+                className="form-control bg-secondary text-white border-dark mb-2"
+                placeholder="Descripción de la tarea"
+                value={descripcion}
+                onChange={(e) => setDescripcion(e.target.value)}
+                rows={3}
+              />
+              
+              {/* Demora */}
+              {!tareaExistente && tiempoTranscurrido && (
+                <div className="text-muted small mb-3">Demora: {tiempoTranscurrido}</div>
+              )}
+              
+              {/* Botones de estado */}
+              <div className="d-flex gap-2 mb-3">
+                <button
+                  className="btn btn-primary flex-grow-1"
+                  onClick={() => guardarTarea('En proceso')}
+                  disabled={!descripcion.trim()}
                 >
-                  <i className="bi bi-plus-lg"></i> Agregar
+                  <i className="bi bi-arrow-repeat me-2"></i> En proceso
+                </button>
+                
+                <button
+                  className="btn btn-warning flex-grow-1"
+                  onClick={() => guardarTarea('En espera')}
+                  disabled={!descripcion.trim()}
+                >
+                  <i className="bi bi-pause me-2"></i> En pausa
+                </button>
+                
+                <button
+                  className="btn btn-success flex-grow-1"
+                  onClick={() => guardarTarea('Resuelto')}
+                  disabled={!descripcion.trim()}
+                >
+                  <i className="bi bi-check-circle me-2"></i> Resuelto
                 </button>
               </div>
+              
+              {/* Botón de eliminar (solo para edición) */}
+              {tareaExistente && (
+                <button 
+                  className="btn btn-danger w-100"
+                  onClick={eliminarTarea}
+                >
+                  <i className="bi bi-trash me-2"></i> Eliminar
+                </button>
+              )}
             </div>
-            
-            <hr className="border-secondary" />
-            
-            <h6>Tareas existentes:</h6>
-            {tareas.length === 0 ? (
-              <div className="alert alert-secondary">
-                No hay tareas registradas para este pedido
-              </div>
-            ) : (
-              <ul className="list-group">
-                {tareas.map(tarea => (
-                  <li 
-                    key={tarea.id} 
-                    className="list-group-item bg-secondary text-white d-flex justify-content-between align-items-center"
-                  >
-                    <div className="form-check">
-                      <input
-                        className="form-check-input"
-                        type="checkbox"
-                        checked={tarea.completada}
-                        onChange={() => toggleCompletada(tarea.id, tarea.completada)}
-                        id={`tarea-${tarea.id}`}
-                      />
-                      <label 
-                        className={`form-check-label ${tarea.completada ? 'text-decoration-line-through' : ''}`}
-                        htmlFor={`tarea-${tarea.id}`}
-                      >
-                        {tarea.descripcion}
-                      </label>
-                    </div>
-                    <small className="text-muted">
-                      {new Date(tarea.created_at).toLocaleString()}
-                    </small>
-                  </li>
-                ))}
-              </ul>
-            )}
-          </div>
-          
-          <div className="modal-footer">
-            <button 
-              type="button" 
-              className="btn btn-secondary" 
-              data-bs-dismiss="modal"
-              onClick={onClose}
-            >
-              Cerrar
-            </button>
           </div>
         </div>
       </div>

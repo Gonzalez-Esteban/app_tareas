@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useRef } from "react";
 import { Link } from "react-router-dom";
 import { supabase } from "../supabase/supabaseClient";
 import dayjs from 'dayjs';
@@ -11,7 +11,7 @@ import TarjetaPedidos from "../components/TarjetaPedidos";
 import ModalTareas from '../components/ModalTareas';
 import Pedidos from '../components/Pedidos';
 
-// Configuración de dayjs
+
 dayjs.extend(duration);
 dayjs.extend(utc);
 dayjs.extend(timezone);
@@ -25,24 +25,78 @@ export default function Home({ usuario }) {
   const [saludo, setSaludo] = useState("");
   const [pedidos, setPedidos] = useState([]);
   const [pedidoEditando, setPedidoEditando] = useState(null);
-  // Agrega este estado para controlar el modal de tareas
-  const [mostrarModalTareas, setMostrarModalTareas] = useState(false);
   const [pedidoSeleccionado, setPedidoSeleccionado] = useState(null);
-  const [modalAbierto, setModalAbierto] = useState(false);
-  const [showPedidosModal, setShowPedidosModal] = useState(false); // Nuevo estado
+  const [showPedidosModal, setShowPedidosModal] = useState(false);
+  const [showTareasModal, setShowTareasModal] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+  const [filtroSector, setFiltroSector] = useState(null);
+  const [filtroEstado, setFiltroEstado] = useState(null);
+  const [tareaSeleccionada, setTareaSeleccionada] = useState(null);
+  const [tareaEditando, setTareaEditando] = useState(null);
+  const containerRef = useRef(null);
+  const [modoTarea, setModoTarea] = useState('crear'); // 'crear' o 'editar'
+  const [timeRefresh, setTimeRefresh] = useState(Date.now());
+  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
 
+  const [localRefresh, setLocalRefresh] = useState(0); // Nuevo estado local
 
   useEffect(() => {
     inicializar();
+    const subscription = supabase
+      .channel('pedidos_changes')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'pedidos' }, () => cargarPedidos())
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(subscription);
+    };
   }, []);
 
   const inicializar = async () => {
     actualizarHoraYSaludo();
     await cargarSectores();
     await cargarPedidos();
+  };
 
-    const intervalo = setInterval(cargarPedidos, 5000);
-    return () => clearInterval(intervalo);
+  // Efecto para manejar actualizaciones sin cerrar el acordeón
+  useEffect(() => {
+    // Esta actualización no afectará el estado showTareas
+    setLocalRefresh(prev => prev + 1);
+  }, [timeRefresh]); // timeRefresh viene como prop desde Home
+
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setTimeRefresh(Date.now()); // Actualiza cada minuto
+    }, 6000); // 60,000 ms = 1 minuto
+  
+    return () => clearInterval(interval);
+  }, []);
+
+  useEffect(() => {
+    const handleResize = () => {
+      if (window.innerWidth < 768) {
+        setIsSidebarCollapsed(true);
+      } else {
+        setIsSidebarCollapsed(false);
+      }
+    };
+  
+    // Ejecutar al montar
+    handleResize();
+  
+    // Escuchar cambios de tamaño
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
+
+  const cargarSectores = async () => {
+    const { data, error } = await supabase.from("sectores").select("*");
+    if (error) {
+      console.error("Error cargando sectores:", error.message);
+    } else {
+      setSectores(data);
+    }
   };
 
   const actualizarHoraYSaludo = () => {
@@ -59,31 +113,35 @@ export default function Home({ usuario }) {
     setHoraActual(`${fechaActual}T${horaStr}`);
   };
 
-  const cargarSectores = async () => {
-    const { data, error } = await supabase.from("sectores").select("*");
-    if (error) {
-      console.error("Error cargando sectores:", error.message);
-    } else {
-      setSectores(data);
-    }
-  };
-
   const cargarPedidos = async () => {
-    const { data, error } = await supabase
-      .from("pedidos")
-      .select("*")
-      .order("created_at", { ascending: false }); // Ordenar por fecha
-  
-    if (error) {
-      console.error("Error cargando pedidos:", error);
-      setPedidos([]); // Asegurar que nunca sea null
-      return;
-    }
-  
-    //console.log("Pedidos cargados:", data); // Debug
-    setPedidos(data || []); // Manejar caso undefined
-  };
+    setLoading(true);
+    try {
+      let query = supabase
+        .from('pedidos')
+        .select('*, tareas(*)')
+        .order('created_at', { ascending: false });
 
+      if (filtroSector) {
+        query = query.eq('sector_id', filtroSector);
+      }
+
+      if (filtroEstado) {
+        query = query.eq('estado', filtroEstado);
+      }
+
+      const { data, error } = await query;
+
+      if (error) throw error;
+      
+      setPedidos(data || []);
+      setError(null);
+    } catch (err) {
+      console.error("Error cargando pedidos:", err);
+      setError("Error al cargar pedidos");
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const borrarPedido = async (id) => {
     if (!window.confirm("¿Estás seguro de borrar este pedido?")) return;
@@ -94,22 +152,29 @@ export default function Home({ usuario }) {
       alert("Error al borrar el pedido.");
     } else {
       setPedidos((prev) => prev.filter((p) => p.id !== id));
+      if (pedidoSeleccionado?.id === id) {
+        setPedidoSeleccionado(null);
+      }
     }
   };
 
-  const agregarTarea = (id) => {
-    const pedido = pedidos.find(p => p.id === id);
-    setPedidoSeleccionado(pedido);
-    setMostrarModalTareas(true);
-    
-    // Abrir modal manualmente
-    const modalElement = document.getElementById("modalTareas");
-    if (modalElement) {
-      const modal = new bootstrap.Modal(modalElement);
-      modal.show();
+  const cambiarEstadoPedido = async (pedidoId, nuevoEstado) => {
+    try {
+      const { error } = await supabase
+        .from('pedidos')
+        .update({ estado: nuevoEstado })
+        .eq('id', pedidoId);
+  
+      if (error) throw error;
+  
+      setPedidos(prev => prev.map(p => 
+        p.id === pedidoId ? { ...p, estado: nuevoEstado } : p
+      ));
+    } catch (error) {
+      console.error('Error cambiando estado:', error);
     }
   };
-  
+
 
   const handleLogout = () => {
     localStorage.removeItem("usuario");
@@ -136,64 +201,149 @@ export default function Home({ usuario }) {
       if (diffEnMinutos <= 1) return "Hace unos segundos";
       
       const dias = diffEnDias;
-      const horas = diffEnHoras - 3 - (24 * dias);
-      const minutos = diffEnMinutos - (horas * 60) - (24 * dias * 60) - 180;
+      const horas = diffEnHoras - (24 * dias);
+      const minutos = diffEnMinutos - (horas * 60) - (24 * dias * 60);
       
       let resultado = "Hace ";
-      if (dias > 0) resultado += `${dias} día${dias !== 1 ? 's' : ''}, `;
-      if (horas > 0) resultado += `${horas} hora${horas !== 1 ? 's' : ''} y `;
-      if (minutos > 0) resultado += `${minutos} minuto${minutos !== 1 ? 's' : ''}`;
-  
+      if (dias > 0) resultado += `${dias}d `;
+      if (horas > 0) resultado += `${horas}h `;
+      if (minutos > 0) resultado += `${minutos}m `;
       return resultado;
     } catch (error) {
       return "Recién creado";
     }
   };
 
+  // Función para abrir modal en modo creación
+  const abrirModalNuevaTarea = () => {
+    setModoTarea('crear');
+    setTareaEditando(null);
+    setShowTareasModal(true);
+  };
 
-    // Modificar las funciones relacionadas
-    const abrirModalEdicion = (pedido) => {
-      setPedidoEditando(pedido);
-      setShowPedidosModal(true);
+    // Función para abrir modal en modo edición
+  const abrirModalEditarTarea = (tarea) => {
+    setModoTarea('editar');
+    setTareaEditando(tarea);
+    setShowTareasModal(true);
+  };
+
+  // Manejador de clic fuera
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (
+        containerRef.current && 
+        !containerRef.current.contains(event.target) &&
+        pedidoSeleccionado
+      ) {
+        // Verificar si el clic no fue en un modal abierto
+        const isModalOpen = showPedidosModal || showTareasModal;
+        const isNavbarClick = event.target.closest('.navbar') || 
+                             event.target.closest('.offcanvas');
+        
+        if (!isModalOpen && !isNavbarClick) {
+          setPedidoSeleccionado(null);
+          setTareaSeleccionada(null);
+        }
+      }
     };
-  
-    const abrirNuevoPedido = () => {
-      setPedidoEditando(null);
-      setShowPedidosModal(true);
+
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
     };
-  
-    const cerrarModal = () => {
-      setShowPedidosModal(false);
-      setPedidoEditando(null);
-    };
-  
+  }, [pedidoSeleccionado, showPedidosModal, showTareasModal]);
+
+  const abrirModalEdicion = (pedido) => {
+    setPedidoEditando(pedido);
+    setShowPedidosModal(true);
+  };
+
+  const abrirNuevoPedido = () => {
+    setPedidoEditando(null);
+    setShowPedidosModal(true);
+  };
+
+  const cerrarModalPedidos = () => {
+    setShowPedidosModal(false);
+    setPedidoEditando(null);
+  };
+
   return (
-    <div style={{ minHeight: "100vh", backgroundColor: "#2d3748", color: "white" }}>
-      {/* Navbar */}
+    <div style={{ minHeight: "100vh", width: "100%", backgroundColor: "#2d3748", color: "white" }}>
+      {/* Navbar (se mantiene exactamente igual) */}
       <nav className="navbar navbar-dark bg-dark fixed-top">
-        <div className="container-fluid d-flex justify-content-between align-items-center">
-          <span className="navbar-brand mb-0 h1">
+        <div className="container-fluid d-flex justify-content-between align-items-center" ref={containerRef}
+           onClick={(e) => {
+            if (e.target === e.currentTarget && pedidoSeleccionado) {
+              setPedidoSeleccionado(null);
+              setTareaSeleccionada(null);
+            }
+          }}
+        >
+          
+        <span className="navbar-brand mb-0 h1">
             {saludo}, {usuario?.nombre || "Usuario"}!
           </span>
-
-          <div className="d-flex align-items-center gap-2">
-            <button
-              className="btn btn-outline-light ms-2"
-              onClick={abrirNuevoPedido}
-            >
-              <i className="bi bi-plus-circle me-1"></i> Nuevo Pedido
-            </button>
-            <button
-              className="navbar-toggler"
-              type="button"
-              data-bs-toggle="offcanvas"
-              data-bs-target="#offcanvasNavbar"
-            >
-              <span className="navbar-toggler-icon"></span>
-            </button>
-          </div>
-
-          {/* Offcanvas */}
+        <div className="d-flex align-items-center gap-2">
+        {!pedidoSeleccionado ? (
+          <button
+            className="btn btn-outline-light ms-2"
+            onClick={abrirNuevoPedido}
+          >
+            <i className="bi bi-plus-circle me-1"></i> Nuevo Pedido
+          </button>
+        ) : (
+          <>
+            {tareaSeleccionada ? (
+              <>
+                <button
+                  className="btn btn-outline-danger me-2"
+                  onClick={() => {
+                    abrirModalEditarTarea(pedidoSeleccionado.tareas.find(t => t.id === tareaSeleccionada));
+                  }}
+                >
+                  <i className="bi bi-trash me-1"></i> Eliminar Tarea
+                </button>
+                <button
+                  className="btn btn-outline-warning me-2"
+                  onClick={() => {
+                    abrirModalEditarTarea(pedidoSeleccionado.tareas.find(t => t.id === tareaSeleccionada));
+                  }}
+                >
+                  <i className="bi bi-pencil me-1"></i> Editar Tarea
+                </button>
+              </>
+            ) : (
+              <>
+                <button
+                  className="btn btn-outline-danger me-2"
+                  onClick={() => borrarPedido(pedidoSeleccionado.id)}
+                >
+                  <i className="bi bi-trash me-1"></i> Eliminar
+                </button>
+                <button
+                  className="btn btn-outline-warning me-2"
+                  onClick={() => abrirModalEdicion(pedidoSeleccionado)}
+                >
+                  <i className="bi bi-pencil me-1"></i> Editar
+                </button>
+                <button
+                  className="btn btn-outline-primary"
+                  onClick={abrirModalNuevaTarea}
+                >
+                  <i className="bi bi-plus-circle me-1"></i> Agregar Tarea
+                </button>
+              </>
+            )}
+          </>
+        )}
+        <button className="navbar-toggler" type="button" data-bs-toggle="offcanvas" data-bs-target="#offcanvasNavbar">
+          <span className="navbar-toggler-icon"></span>
+        </button>
+      </div>
+  
+          {/* Offcanvas con filtros */}
           <div className="offcanvas offcanvas-end text-bg-dark" id="offcanvasNavbar">
             <div className="offcanvas-header">
               <h5 className="offcanvas-title">Menú</h5>
@@ -201,6 +351,31 @@ export default function Home({ usuario }) {
             </div>
             <div className="offcanvas-body d-flex flex-column justify-content-between">
               <ul className="navbar-nav flex-grow-1">
+                <li className="nav-item dropdown">
+                  <a className="nav-link dropdown-toggle" href="#" role="button" data-bs-toggle="dropdown">
+                    Filtrar por Sector
+                  </a>
+                  <ul className="dropdown-menu">
+                    <li><button className="dropdown-item" onClick={() => { setFiltroSector(null); cargarPedidos(); }}>Todos</button></li>
+                    {sectores.map(sector => (
+                      <li key={sector.id}>
+                        <button className="dropdown-item" onClick={() => { setFiltroSector(sector.id); cargarPedidos(); }}>
+                          {sector.nombre}
+                        </button>
+                      </li>
+                    ))}
+                  </ul>
+                </li>
+                <li className="nav-item dropdown mt-2">
+                  <a className="nav-link dropdown-toggle" href="#" role="button" data-bs-toggle="dropdown">
+                    Filtrar por Estado
+                  </a>
+                  <ul className="dropdown-menu">
+                    <li><button className="dropdown-item" onClick={() => { setFiltroEstado(null); cargarPedidos(); }}>Todos</button></li>
+                    <li><button className="dropdown-item" onClick={() => { setFiltroEstado('En proceso'); cargarPedidos(); }}>En proceso</button></li>
+                    <li><button className="dropdown-item" onClick={() => { setFiltroEstado('Resuelto'); cargarPedidos(); }}>Resuelto</button></li>
+                  </ul>
+                </li>
                 <li className="nav-item">
                   <Link className="nav-link text-white" to="/pedidos">
                     <i className="bi bi-card-checklist me-2"></i>Pedidos
@@ -219,48 +394,296 @@ export default function Home({ usuario }) {
           </div>
         </div>
       </nav>
-
-      {/* Contenido principal */}
-      <div style={{ paddingTop: "80px" }} className="container">
-      <Pedidos
-    showModal={showPedidosModal} // Pasar la prop
-    pedidoEditando={pedidoEditando}
-    onClose={cerrarModal}
-    sectores={sectores}
-    usuario={usuario}
-    onGuardarSuccess={() => {
-      cargarPedidos();
-      cerrarModal();
-    }}
-  />
-
-        {/* Tarjetas de pedidos */}
-        <div className="row mt-4">
-          {pedidos.map((pedido) => (
-            <TarjetaPedidos
-              key={pedido.id}
-              pedido={pedido}
-              usuario={usuario}
-              sectores={sectores}
-              obtenerNombreSector={obtenerNombreSector}
-              borrarPedido={borrarPedido}
-              abrirModalEdicion={abrirModalEdicion}
-              agregarTarea={agregarTarea}
-              calcularTiempoTranscurrido={calcularTiempoTranscurrido}
-            />
-          ))}
+  
+      {/* Contenido principal con sidebar colapsable */}
+          {/* Contenido principal con sidebar mejorado */}
+          <div style={{ 
+            display: 'flex', 
+            height: 'calc(180vh - 80px)', // Asegura altura completa restando altura del navbar
+            marginTop: '50px', // Empuja el contenido debajo del navbar
+            position: 'static',
+            overflow: 'hidden',
+            overflowY: 'auto', 
+            width: '100%'
+          }}>
+      {/* Sidebar mejorado */}
+      <div 
+        style={{
+          width: isSidebarCollapsed ? '50px' : '300px',
+          backgroundColor: '#212529',
+          overflowY: 'auto',
+          transition: 'width 0.3s ease',
+          position: 'sticky',
+          flexShrink: 0,
+          borderRight: '1px solid #4a5568',
+          display: 'flex',
+          flexDirection: 'column',
+          height: '100%'
+        }}
+      >
+        {/* Cabecera del sidebar */}
+        <div style={{ 
+          padding: '16px',
+          position: 'sticky',
+          top: 0,
+          backgroundColor: '#212529',
+          zIndex: 1,
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'center',
+          borderBottom: '1px solid #2d3748',
+          minHeight: '60px'
+        }}>
+          {!isSidebarCollapsed && (
+            <h4 style={{ 
+              color: 'white', 
+              margin: 0,
+              whiteSpace: 'nowrap'
+            }}>
+              Pendientes
+            </h4>
+          )}
+          <button 
+            onClick={() => setIsSidebarCollapsed(!isSidebarCollapsed)}
+            style={{
+              background: 'none',
+              border: 'none',
+              color: 'white',
+              cursor: 'pointer',
+              padding: '8px',
+              flexShrink: 0,
+              marginLeft: isSidebarCollapsed ? '0' : 'auto'
+            }}
+          >
+            <i className={`bi bi-chevron-${isSidebarCollapsed ? 'right' : 'left'}`}></i>
+          </button>
+        </div>
+        
+        {/* Contenido del sidebar - Siempre ocupa el espacio restante */}
+        <div style={{ 
+          flex: 1,
+          overflowY: 'auto',
+          padding: isSidebarCollapsed ? '16px 8px' : '16px',
+          display: 'flex',
+          flexDirection: 'column'
+        }}>
+          {isSidebarCollapsed ? (
+            <div style={{
+              display: 'flex',
+              flexDirection: 'column',
+              alignItems: 'center',
+              color: '#a0aec0',
+              height: '100%'
+            }}>
+              <i className="bi bi-calendar-event" style={{ fontSize: '1.5rem', marginBottom: '8px' }}></i>
+            </div>
+          ) : (
+            <div style={{ color: '#a0aec0', flex: 1 }}>
+              <p>Contenido de tareas programadas aparecerá aquí...</p>
+              {/* Aquí puedes poner tu lista de tareas programadas */}
+            </div>
+          )}
         </div>
       </div>
-        {/* Modal de Tareas */}
-        {mostrarModalTareas && (
-        <ModalTareas
-          pedido={pedidoSeleccionado}
-          usuario={usuario}
-          onClose={() => setMostrarModalTareas(false)}
-        />
-      )}
+
+  
+        {/* Contenido principal (se mantiene igual) */}
+        <div style={{
+          flexGrow: 1,
+          overflowY: 'auto',
+          padding: '20px'
+        }}>
+          <h4 style={{ color: 'white', marginBottom: '20px' }}>Diarios</h4>
+          
+          {/* Modal de Pedidos */}
+          <Pedidos
+            showModal={showPedidosModal}
+            pedidoEditando={pedidoEditando}
+            onClose={cerrarModalPedidos}
+            sectores={sectores}
+            usuario={usuario}
+            onGuardarSuccess={() => {
+              cargarPedidos();
+              cerrarModalPedidos();
+            }}
+          />
     
+          {/* Modal de Tareas */}
+          <ModalTareas
+            showModal={showTareasModal}
+            pedido={pedidoSeleccionado}
+            tarea={modoTarea === 'editar' ? tareaEditando : null}
+            onClose={() => {
+              setShowTareasModal(false);
+              setTareaEditando(null);
+              setTareaSeleccionada(null);
+            }}
+            onTareaGuardada={() => {
+              cargarPedidos();
+              setTareaEditando(null);
+              setTareaSeleccionada(null);
+            }}
+            cambiarEstadoPedido={cambiarEstadoPedido}
+          />
+            
+          {/* Estados de carga y error */}
+          {loading && (
+            <div className="text-center my-5">
+              <div className="spinner-border text-primary" role="status">
+                <span className="visually-hidden">Cargando...</span>
+              </div>
+              <p className="text-white mt-2">Cargando pedidos...</p>
+            </div>
+          )}
+    
+          {error && (
+            <div className="alert alert-danger">
+              {error}
+            </div>
+          )}
+    
+          {/* Tarjetas de pedidos agrupadas por fecha */}
+          {!loading && !error && (
+            <div className="row mt-3">
+              {(() => {
+                const hoy = dayjs().startOf('day');
+                const ayer = hoy.subtract(1, 'day');
+    
+                const pedidosHoy = pedidos.filter(p => dayjs(p.created_at).isAfter(hoy));
+                const pedidosAyer = pedidos.filter(p => dayjs(p.created_at).isAfter(ayer) && dayjs(p.created_at).isBefore(hoy));
+                const pedidosAntiguos = pedidos.filter(p => dayjs(p.created_at).isBefore(ayer));
+    
+                return (
+                  <>
+                  {/* HOY */}
+                  {pedidosHoy.length > 0 && (
+                    <div style={{ marginBottom: '30px' }}>
+                      <h5 className="text-white">Hoy</h5>
+                      <div style={{
+                        display: 'grid',
+                        gridTemplateColumns: 'repeat(auto-fill, minmax(650px, 1fr))',
+                        gap: '1px',
+                        width: '100%'
+                      }}>
+                        {pedidosHoy.map(pedido => (
+                          <TarjetaPedidos
+                            key={pedido.id}
+                            pedido={pedido}
+                            usuario={usuario}
+                            sectores={sectores}
+                            obtenerNombreSector={obtenerNombreSector}
+                            borrarPedido={borrarPedido}
+                            abrirModalEdicion={abrirModalEdicion}
+                            cambiarEstadoPedido={cambiarEstadoPedido}
+                            timeRefresh={timeRefresh}
+                            calcularTiempoTranscurrido={() => calcularTiempoTranscurrido(pedido.created_at)}
+                            onSelectPedido={(id) => {
+                              setPedidoSeleccionado(id === pedidoSeleccionado?.id ? null : pedidos.find(p => p.id === id));
+                              setTareaSeleccionada(null);
+                            }}
+                            onSelectTarea={(pedidoId, tareaId) => {
+                              setPedidoSeleccionado(pedidos.find(p => p.id === pedidoId));
+                              setTareaSeleccionada(tareaId);
+                            }}
+                            selectedPedidoId={pedidoSeleccionado?.id}
+                            selectedTareaId={tareaSeleccionada}
+                          />
+
+                        ))}
+                      </div>
+                      </div>
+                   
+                      
+                    )}
+              
+                  {/* AYER */}
+                  {pedidosAyer.length > 0 && (
+                    <div style={{ marginBottom: '30px' }}>
+                      <h5 className="text-white">Ayer</h5>
+                      <div style={{
+                        display: 'grid',
+                        gridTemplateColumns: 'repeat(auto-fill, minmax(650px, 1fr))',
+                        gap: '1px',
+                        width: '100%'
+                      }}>
+                        {pedidosAyer.map(pedido => (
+  
+                          <TarjetaPedidos
+                            key={pedido.id}
+                            pedido={pedido}
+                            usuario={usuario}
+                            sectores={sectores}
+                            obtenerNombreSector={obtenerNombreSector}
+                            borrarPedido={borrarPedido}
+                            abrirModalEdicion={abrirModalEdicion}
+                            cambiarEstadoPedido={cambiarEstadoPedido}
+                            timeRefresh={timeRefresh}
+                            calcularTiempoTranscurrido={() => calcularTiempoTranscurrido(pedido.created_at)}
+                            onSelectPedido={(id) => {
+                              setPedidoSeleccionado(id === pedidoSeleccionado?.id ? null : pedidos.find(p => p.id === id));
+                              setTareaSeleccionada(null);
+                            }}
+                            onSelectTarea={(pedidoId, tareaId) => {
+                              setPedidoSeleccionado(pedidos.find(p => p.id === pedidoId));
+                              setTareaSeleccionada(tareaId);
+                            }}
+                            selectedPedidoId={pedidoSeleccionado?.id}
+                            selectedTareaId={tareaSeleccionada}
+                          />
+                
+                        ))}
+                        </div>
+                        </div>
+                     
+                        
+                      )}
+                
+                        {/* MÁS ANTIGUOS */}
+                  {pedidosAntiguos.length > 0 && (
+                    <div style={{ marginBottom: '30px' }}>
+                      <h5 className="text-white">Más antiguos</h5>
+                      <div style={{
+                        display: 'grid',
+                        gridTemplateColumns: 'repeat(auto-fill, minmax(650px, 1fr))',
+                        gap: '1px',
+                        width: '100%'
+                      }}>
+                        {pedidosAntiguos.map(pedido => (
+                          <TarjetaPedidos
+                            key={pedido.id}
+                            pedido={pedido}
+                            usuario={usuario}
+                            sectores={sectores}
+                            obtenerNombreSector={obtenerNombreSector}
+                            borrarPedido={borrarPedido}
+                            abrirModalEdicion={abrirModalEdicion}
+                            cambiarEstadoPedido={cambiarEstadoPedido}
+                            timeRefresh={timeRefresh}
+                            calcularTiempoTranscurrido={() => calcularTiempoTranscurrido(pedido.created_at)}
+                            onSelectPedido={(id) => {
+                              setPedidoSeleccionado(id === pedidoSeleccionado?.id ? null : pedidos.find(p => p.id === id));
+                              setTareaSeleccionada(null);
+                            }}
+                            onSelectTarea={(pedidoId, tareaId) => {
+                              setPedidoSeleccionado(pedidos.find(p => p.id === pedidoId));
+                              setTareaSeleccionada(tareaId);
+                            }}
+                            selectedPedidoId={pedidoSeleccionado?.id}
+                            selectedTareaId={tareaSeleccionada}
+                          />
+                        ))}
+                        </div>
+                        </div>
+                     
+                        
+                      )}
+                  </>
+                );
+              })()}
+            </div>
+          )}
+        </div>
+      </div>
     </div>
-    
   );
 }

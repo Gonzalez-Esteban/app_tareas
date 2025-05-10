@@ -66,6 +66,8 @@ const Pedidos = ({
       }
     }
   }, [showModal, pedidoEditando]);
+  
+  
   const cleanUpModal = () => {
     const backdrops = document.getElementsByClassName('modal-backdrop');
     Array.from(backdrops).forEach(backdrop => backdrop.remove());
@@ -148,7 +150,8 @@ const Pedidos = ({
     <div 
       ref={modalRef}
       className="modal fade" 
-      id="nuevoPedidoModal" 
+      id="nuevoPedidoModal"
+
       tabIndex="-1"
       aria-labelledby="modalTitle"
       aria-hidden="true"
