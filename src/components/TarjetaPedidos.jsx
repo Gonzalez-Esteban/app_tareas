@@ -78,7 +78,7 @@ const TarjetaPedidos = ({
 
  
   return (
-    <div className="col-md-4 mb-3" key={`pedido-${pedido.id}-${localRefresh}`}>
+    <div className="mb-3">
       <div 
         className={`card text-white ${borde}`} 
         style={cardStyle}

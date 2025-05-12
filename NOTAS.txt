@@ -1,2 +1,30 @@
 Cambiar la url para el loguin en la BD una vez que se haga el despliegue en la siguiente direccion:
 https://supabase.com/dashboard/project/tywlhxexsynlevxeratm/auth/url-configuration
+
+Proyectos
+
+Nombre
+ Resumen de la descripción
+
+Descripción
+ Detalle del trabajo
+
+Objetivo/s
+ Que se va a lograr - Cual es el fin 
+
+Ubicación 
+ - Sector
+  - Punto especifico 
+  - Área del sector afectada
+
+Realización
+- Etapas
+ - Tareas (fechas estimadas)
+ - Fechas programadas
+	Fecha inicio (fecha actual)
+	Fecha finalización (Fecha de ultima tarea realizada)
+
+Verificación
+- Comprobación de funcionamiento (tarea? etapa?)
+
+Estado del proyecto

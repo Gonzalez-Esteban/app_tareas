@@ -37,7 +37,7 @@ export default function Home({ usuario }) {
   const containerRef = useRef(null);
   const [modoTarea, setModoTarea] = useState('crear'); // 'crear' o 'editar'
   const [timeRefresh, setTimeRefresh] = useState(Date.now());
-  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
+  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(true);
 
   const [localRefresh, setLocalRefresh] = useState(0); // Nuevo estado local
 
@@ -280,19 +280,22 @@ export default function Home({ usuario }) {
               setTareaSeleccionada(null);
             }
           }}
+          style={{ borderWidth: '2px', fontWeight: '700', fontSize: '1rem', color: '#a0aec0'}}
         >
           
-        <span className="navbar-brand mb-0 h1">
+        <span className="navbar-brand mb-0 h2" style={{ color: '#a0aec0' }}>
             {saludo}, {usuario?.nombre || "Usuario"}!
-          </span>
-        <div className="d-flex align-items-center gap-2">
+        </span>
+        
+        <div className="d-flex align-items-center gap-2" >
         {!pedidoSeleccionado ? (
-          <button
-            className="btn btn-outline-light ms-2"
-            onClick={abrirNuevoPedido}
-          >
-            <i className="bi bi-plus-circle me-1"></i> Nuevo Pedido
-          </button>
+ <button
+  className="btn btn-outline-secondary ms-3"
+  onClick={abrirNuevoPedido}
+  style={{ borderWidth: 'px', fontWeight: '700', fontSize: '1rem', color: '#a0aec0'}}
+>
+  <i className="bi bi-plus-lg me-1" ></i> Pedido
+</button>
         ) : (
           <>
             {tareaSeleccionada ? (
@@ -355,7 +358,7 @@ export default function Home({ usuario }) {
                   <a className="nav-link dropdown-toggle" href="#" role="button" data-bs-toggle="dropdown">
                     Filtrar por Sector
                   </a>
-                  <ul className="dropdown-menu">
+                  <ul className="dropdown-menu" >
                     <li><button className="dropdown-item" onClick={() => { setFiltroSector(null); cargarPedidos(); }}>Todos</button></li>
                     {sectores.map(sector => (
                       <li key={sector.id}>
@@ -395,96 +398,99 @@ export default function Home({ usuario }) {
         </div>
       </nav>
   
-      {/* Contenido principal con sidebar colapsable */}
-          {/* Contenido principal con sidebar mejorado */}
-          <div style={{ 
-            display: 'flex', 
-            height: 'calc(180vh - 80px)', // Asegura altura completa restando altura del navbar
-            marginTop: '50px', // Empuja el contenido debajo del navbar
-            position: 'static',
-            overflow: 'hidden',
-            overflowY: 'auto', 
-            width: '100%'
-          }}>
-      {/* Sidebar mejorado */}
-      <div 
+{/* Contenido principal con sidebar colapsable */}
+<div style={{ 
+  display: 'flex', 
+  height: 'calc(180vh - 80px)', // Asegura altura completa restando altura del navbar
+  marginTop: '50px',
+  position: 'static',
+  overflow: 'hidden',
+  overflowY: 'auto',
+  width: '100%'
+}}>
+  
+  {/* Sidebar mejorado */}
+  <div 
+    className="sidebar-scroll"
+    style={{
+      width: isSidebarCollapsed ? '50px' : '390px',
+      backgroundColor: '#212529',
+      overflowY: 'auto',
+      transition: 'width 0.3s ease',
+      position: 'sticky',
+      flexShrink: 0,
+      borderRight: '1px solid #4a5568',
+      display: 'flex',
+      flexDirection: 'column',
+      borderTop: '1px solid #4a5568',
+      height: '100%',
+      scrollbarWidth: 'thin',              // Firefox
+      scrollbarColor: '#444 #212529'       // Firefox
+    }}
+  >
+    {/* Cabecera del sidebar */}
+    <div style={{ 
+      padding: '10px',
+      position: 'sticky',
+      top: 0,
+      backgroundColor: '#212529',
+      zIndex: 1,
+      display: 'flex',
+      justifyContent: 'space-between',
+      borderTop: '1px solid #4a5568',
+      alignItems: 'center',
+      borderBottom: '1px solid #2d3748',
+      minHeight: '40px'
+    }}>
+      {!isSidebarCollapsed && (
+        <h5 style={{ 
+          color: '#a0aec0',
+          whiteSpace: 'nowrap'
+        }}>
+          Pendientes
+        </h5>
+      )}
+      <button 
+        onClick={() => setIsSidebarCollapsed(!isSidebarCollapsed)}
         style={{
-          width: isSidebarCollapsed ? '50px' : '300px',
-          backgroundColor: '#212529',
-          overflowY: 'auto',
-          transition: 'width 0.3s ease',
-          position: 'sticky',
+          background: 'none',
+          border: 'none',
+          color: '#a0aec0',
+          cursor: 'pointer',
+          padding: '8px',
           flexShrink: 0,
-          borderRight: '1px solid #4a5568',
-          display: 'flex',
-          flexDirection: 'column',
-          height: '100%'
+          marginLeft: isSidebarCollapsed ? '0' : 'auto'
         }}
       >
-        {/* Cabecera del sidebar */}
-        <div style={{ 
-          padding: '16px',
-          position: 'sticky',
-          top: 0,
-          backgroundColor: '#212529',
-          zIndex: 1,
+        <i className={`bi bi-chevron-${isSidebarCollapsed ? 'right' : 'left'}`}></i>
+      </button>
+    </div>
+    
+    {/* Contenido del sidebar */}
+    <div style={{ 
+      flex: 1,
+      overflowY: 'auto',
+      padding: isSidebarCollapsed ? '16px 8px' : '16px',
+      display: 'flex',
+      flexDirection: 'column'
+    }}>
+      {isSidebarCollapsed ? (
+        <div style={{
           display: 'flex',
-          justifyContent: 'space-between',
+          flexDirection: 'column',
           alignItems: 'center',
-          borderBottom: '1px solid #2d3748',
-          minHeight: '60px'
+          color: '#a0aec0',
+          height: '100%'
         }}>
-          {!isSidebarCollapsed && (
-            <h4 style={{ 
-              color: 'white', 
-              margin: 0,
-              whiteSpace: 'nowrap'
-            }}>
-              Pendientes
-            </h4>
-          )}
-          <button 
-            onClick={() => setIsSidebarCollapsed(!isSidebarCollapsed)}
-            style={{
-              background: 'none',
-              border: 'none',
-              color: 'white',
-              cursor: 'pointer',
-              padding: '8px',
-              flexShrink: 0,
-              marginLeft: isSidebarCollapsed ? '0' : 'auto'
-            }}
-          >
-            <i className={`bi bi-chevron-${isSidebarCollapsed ? 'right' : 'left'}`}></i>
-          </button>
+          <i className="bi bi-calendar-event" style={{ fontSize: '1.2rem', marginBottom: '8px' }}></i>
         </div>
-        
-        {/* Contenido del sidebar - Siempre ocupa el espacio restante */}
-        <div style={{ 
-          flex: 1,
-          overflowY: 'auto',
-          padding: isSidebarCollapsed ? '16px 8px' : '16px',
-          display: 'flex',
-          flexDirection: 'column'
-        }}>
-          {isSidebarCollapsed ? (
-            <div style={{
-              display: 'flex',
-              flexDirection: 'column',
-              alignItems: 'center',
-              color: '#a0aec0',
-              height: '100%'
-            }}>
-              <i className="bi bi-calendar-event" style={{ fontSize: '1.5rem', marginBottom: '8px' }}></i>
-            </div>
-          ) : (
-            <div style={{ color: '#a0aec0', flex: 1 }}>
-              <p>Contenido de tareas programadas aparecerá aquí...</p>
-              {/* Aquí puedes poner tu lista de tareas programadas */}
-            </div>
-          )}
+      ) : (
+        <div style={{ color: '#a0aec0', flex: 1 }}>
+          <p>Sin tareas para hoy</p>
         </div>
-      </div>
+      )}
+    </div>
+  </div>
 
   
         {/* Contenido principal (se mantiene igual) */}
@@ -492,8 +498,8 @@ export default function Home({ usuario }) {
           flexGrow: 1,
           overflowY: 'auto',
           padding: '20px'
-        }}>
-          <h4 style={{ color: 'white', marginBottom: '20px' }}>Diarios</h4>
+        }}> 
+          <h4 style={{ fontSize: '1.2rem', color: '#a0aec0', marginBottom: '20px' }}>Diarios</h4>
           
           {/* Modal de Pedidos */}
           <Pedidos
@@ -558,14 +564,17 @@ export default function Home({ usuario }) {
                   {/* HOY */}
                   {pedidosHoy.length > 0 && (
                     <div style={{ marginBottom: '30px' }}>
-                      <h5 className="text-white">Hoy</h5>
-                      <div style={{
-                        display: 'grid',
-                        gridTemplateColumns: 'repeat(auto-fill, minmax(650px, 1fr))',
-                        gap: '1px',
-                        width: '100%'
-                      }}>
+                      <h5 className="text" style={{ color: '#a0aec0' }}>Hoy</h5>
+                      <div
+                          style={{
+                            display: "grid",
+                            gap: "16px",
+                            gridTemplateColumns: "repeat(auto-fit, minmax(310px, 360px))",
+                            justifyContent: "flex-start", // o "center" si querés centrarlas
+                          }}
+                        >
                         {pedidosHoy.map(pedido => (
+                        
                           <TarjetaPedidos
                             key={pedido.id}
                             pedido={pedido}
@@ -599,15 +608,18 @@ export default function Home({ usuario }) {
                   {/* AYER */}
                   {pedidosAyer.length > 0 && (
                     <div style={{ marginBottom: '30px' }}>
-                      <h5 className="text-white">Ayer</h5>
-                      <div style={{
-                        display: 'grid',
-                        gridTemplateColumns: 'repeat(auto-fill, minmax(650px, 1fr))',
-                        gap: '1px',
-                        width: '100%'
-                      }}>
+                      <h5 className="text" style={{ color: '#a0aec0' }}>Ayer</h5>
+                      <div
+                        style={{
+                          display: "grid",
+                          flexWrap: "wrap",
+                          gap: "12px",
+                          gridTemplateColumns: "repeat(auto-fit, minmax(310px, 360px))",
+                          justifyContent: "flex-start", // o "center" si querés centrarlas
+                        }}
+                      >
                         {pedidosAyer.map(pedido => (
-  
+
                           <TarjetaPedidos
                             key={pedido.id}
                             pedido={pedido}
@@ -630,7 +642,7 @@ export default function Home({ usuario }) {
                             selectedPedidoId={pedidoSeleccionado?.id}
                             selectedTareaId={tareaSeleccionada}
                           />
-                
+              
                         ))}
                         </div>
                         </div>
@@ -641,14 +653,18 @@ export default function Home({ usuario }) {
                         {/* MÁS ANTIGUOS */}
                   {pedidosAntiguos.length > 0 && (
                     <div style={{ marginBottom: '30px' }}>
-                      <h5 className="text-white">Más antiguos</h5>
-                      <div style={{
-                        display: 'grid',
-                        gridTemplateColumns: 'repeat(auto-fill, minmax(650px, 1fr))',
-                        gap: '1px',
-                        width: '100%'
-                      }}>
+                      <h5 className="text" style={{ color: '#a0aec0' }}>Más antiguos</h5>
+                      <div
+                        style={{
+                          display: "grid",
+                          flexWrap: "wrap",
+                          gridTemplateColumns: "repeat(auto-fit, minmax(310px, 360px))",
+                          gap: "16px",
+                          justifyContent: "flex-start", // o "center" si querés centrarlas
+                        }}
+                      >
                         {pedidosAntiguos.map(pedido => (
+                       
                           <TarjetaPedidos
                             key={pedido.id}
                             pedido={pedido}
@@ -671,6 +687,7 @@ export default function Home({ usuario }) {
                             selectedPedidoId={pedidoSeleccionado?.id}
                             selectedTareaId={tareaSeleccionada}
                           />
+                         
                         ))}
                         </div>
                         </div>
