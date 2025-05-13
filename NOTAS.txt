@@ -1,6 +1,16 @@
 Cambiar la url para el loguin en la BD una vez que se haga el despliegue en la siguiente direccion:
 https://supabase.com/dashboard/project/tywlhxexsynlevxeratm/auth/url-configuration
 
+
+subir cambios github
+git status
+git add .
+git commit -m "Tu mensaje describiendo los cambios"
+git push origin main
+
+bajar cambios github
+git pull origin main
+
 Proyectos
 
 Nombre
@@ -28,3 +38,20 @@ Verificación
 - Comprobación de funcionamiento (tarea? etapa?)
 
 Estado del proyecto
+
+
+proyecto_id
+sector_id
+Ubicación
+nombre (resumen)
+descripcion
+objetivos
+imagen_url
+id_uuid (Creado por?)
+vencimiento (fecha de finalización?)
+
+etapas = pedidos?
+tareas con fecha de inicio y tolerancia en dias? fecha programada para?
+
+
+

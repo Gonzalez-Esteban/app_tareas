@@ -4,6 +4,7 @@ import { toast } from 'react-toastify';
 import dayjs from 'dayjs';
 import duration from 'dayjs/plugin/duration';
 import 'bootstrap/dist/css/bootstrap.min.css';
+import { calcularTiempoTranscurrido } from '../utils/utilities';
 
 dayjs.extend(duration);
 
@@ -159,73 +160,90 @@ const ModalTareas = ({
     onClose();
   };
 
-  const guardarTarea = async (estado) => {
-    if (!descripcion.trim()) {
-      toast.error('La descripción no puede estar vacía');
-      return;
-    }
+ const guardarTarea = async (estado) => {
+  if (!descripcion.trim()) {
+    toast.error('La descripción no puede estar vacía');
+    return;
+  }
 
-    if (numeroPuesto && !/^\d{1,2}$/.test(numeroPuesto)) {
-      toast.error('El número de puesto debe tener máximo 2 cifras');
-      return;
-    }
-  
-    try {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) throw new Error('No autenticado');
+  if (numeroPuesto && !/^\d{1,2}$/.test(numeroPuesto)) {
+    toast.error('El número de puesto debe tener máximo 2 cifras');
+    return;
+  }
 
-      // Crear valor de puesto completo (ej: "SOP-12")
-      const puestoCompleto = `${abreviaturaSector}${numeroPuesto ? `-${numeroPuesto}` : ''}`;
-  
-      // 1. Actualizar el pedido con el puesto y estado
-      if (pedido?.id) {
-        const { error: errorPedido } = await supabase
-          .from('pedidos')
-          .update({ 
-            puesto: puestoCompleto,
-            estado
-          })
-          .eq('id', pedido.id);
-        
-        if (errorPedido) throw errorPedido;
-      }
+  try {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) throw new Error('No autenticado');
 
-      // 2. Guardar/actualizar la tarea
-      const ahora = new Date().toISOString();
-      const tareaData = {
-        descripcion,
-        completada: estado === 'Resuelto'
+    // Crear valor de puesto completo (ej: "SOP-12")
+    const puestoCompleto = `${abreviaturaSector}${numeroPuesto ? `-${numeroPuesto}` : ''}`;
+    const ahora = new Date();
+    const timestamp = ahora.toISOString();
+
+    // 1. Actualizar el pedido con el puesto y estado
+    if (pedido?.id) {
+      const updateData = { 
+        puesto: puestoCompleto,
+        estado
       };
 
-      if (tareaExistente) {
-        const { error } = await supabase
-          .from('tareas')
-          .update(tareaData)
-          .eq('id', tareaExistente.id);
-  
-        if (error) throw error;
-        toast.success('Tarea actualizada');
-      } else {
-        tareaData.id_pedido = pedido.id;
-        tareaData.id_uuid = user.id;
-        tareaData.transcurrido = ahora;
-        tareaData.tiempo_desde_ultimo = tiempoTranscurrido || '0m';
+      // Si se está marcando como resuelto, actualizar campos adicionales
+      if (estado === 'Resuelto') {
+        // Calcular el tiempo transcurrido sin "Hace"
+        const tiempoTotal = calcularTiempoTranscurrido(pedido.created_at) 
+        const tiempoTranscurridoFormateado = tiempoTotal.replace('Hace ', '');
         
-        const { error } = await supabase
-          .from('tareas')
-          .insert(tareaData);
-  
-        if (error) throw error;
-        toast.success('Tarea agregada');
+        updateData.finalizacion = timestamp;
+        updateData.transcurrido = tiempoTranscurridoFormateado;
+        updateData.solucion = descripcion;
+        updateData.resolvio = user.id || user.email; // Ajusta según cómo tengas el nombre del usuario
       }
-  
-      onTareaGuardada();
-      handleClose();
-    } catch (error) {
-      console.error('Error al guardar tarea:', error);
-      toast.error(error.message || 'Error al guardar tarea');
+
+      const { error: errorPedido } = await supabase
+        .from('pedidos')
+        .update(updateData)
+        .eq('id', pedido.id);
+      
+      if (errorPedido) throw errorPedido;
     }
-  };
+
+    // 2. Guardar/actualizar la tarea
+    const tareaData = {
+      descripcion,
+      completada: estado === 'Resuelto'
+    };
+
+    if (tareaExistente) {
+      const { error } = await supabase
+        .from('tareas')
+        .update(tareaData)
+        .eq('id', tareaExistente.id);
+
+      if (error) throw error;
+      toast.success('Tarea actualizada');
+    } else {
+      tareaData.id_pedido = pedido.id;
+      tareaData.id_uuid = user.id;
+      tareaData.transcurrido = timestamp;
+      tareaData.tiempo_desde_ultimo = tiempoTranscurrido || '0m';
+      tareaData.puesto = puestoCompleto;
+      tareaData.es_prog = false
+      
+      const { error } = await supabase
+        .from('tareas')
+        .insert(tareaData);
+
+      if (error) throw error;
+      toast.success('Tarea agregada');
+    }
+
+    onTareaGuardada();
+    handleClose();
+  } catch (error) {
+    console.error('Error al guardar tarea:', error);
+    toast.error(error.message || 'Error al guardar tarea');
+  }
+};
 
   const eliminarTarea = async () => {
     if (!window.confirm('¿Estás seguro de eliminar esta tarea?')) return;
