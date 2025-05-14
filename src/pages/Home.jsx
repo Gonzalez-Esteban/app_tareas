@@ -10,7 +10,7 @@ import 'dayjs/locale/es';
 import TarjetaPedidos from "../components/TarjetaPedidos";
 import ModalTareas from '../components/ModalTareas';
 import Pedidos from '../components/Pedidos';
-
+import ModalTareasProgramadas from '../components/ModalTareasProgramadas';
 
 dayjs.extend(duration);
 dayjs.extend(utc);
@@ -24,6 +24,7 @@ export default function Home({ usuario }) {
   const [horaActual, setHoraActual] = useState("");
   const [saludo, setSaludo] = useState("");
   const [pedidos, setPedidos] = useState([]);
+  const [tareasProgramadas, setTareasProgramadas] = useState([]);
   const [pedidoEditando, setPedidoEditando] = useState(null);
   const [pedidoSeleccionado, setPedidoSeleccionado] = useState(null);
   const [showPedidosModal, setShowPedidosModal] = useState(false);
@@ -35,21 +36,30 @@ export default function Home({ usuario }) {
   const [tareaSeleccionada, setTareaSeleccionada] = useState(null);
   const [tareaEditando, setTareaEditando] = useState(null);
   const containerRef = useRef(null);
-  const [modoTarea, setModoTarea] = useState('crear'); // 'crear' o 'editar'
+  const [modoTarea, setModoTarea] = useState('crear');
   const [timeRefresh, setTimeRefresh] = useState(Date.now());
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(true);
-
-  const [localRefresh, setLocalRefresh] = useState(0); // Nuevo estado local
+  const [showProgramadasModal, setShowProgramadasModal] = useState(false);
+  const [filtroProgEstado, setFiltroProgEstado] = useState(null);
+  const [filtroProgUsuario, setFiltroProgUsuario] = useState(null);
+  const modalTareasProgramadasRef = useRef();
+  const [localRefresh, setLocalRefresh] = useState(0);
 
   useEffect(() => {
     inicializar();
-    const subscription = supabase
+    const subscriptionPedidos = supabase
       .channel('pedidos_changes')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'pedidos' }, () => cargarPedidos())
       .subscribe();
 
+    const subscriptionProgramadas = supabase
+      .channel('programadas_changes')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'programadas' }, () => cargarProgramadas())
+      .subscribe();
+
     return () => {
-      supabase.removeChannel(subscription);
+      supabase.removeChannel(subscriptionPedidos);
+      supabase.removeChannel(subscriptionProgramadas);
     };
   }, []);
 
@@ -57,21 +67,51 @@ export default function Home({ usuario }) {
     actualizarHoraYSaludo();
     await cargarSectores();
     await cargarPedidos();
+    await cargarProgramadas();
   };
 
-  // Efecto para manejar actualizaciones sin cerrar el acordeón
   useEffect(() => {
-    // Esta actualización no afectará el estado showTareas
     setLocalRefresh(prev => prev + 1);
-  }, [timeRefresh]); // timeRefresh viene como prop desde Home
+  }, [timeRefresh]);
 
   useEffect(() => {
     const interval = setInterval(() => {
-      setTimeRefresh(Date.now()); // Actualiza cada minuto
-    }, 6000); // 60,000 ms = 1 minuto
-  
+      setTimeRefresh(Date.now());
+    }, 60000); // Actualizar cada minuto
+
     return () => clearInterval(interval);
   }, []);
+
+  const cargarProgramadas = async () => {
+    setLoading(true);
+    try {
+      let query = supabase
+        .from('programadas')
+        .select('*')
+        .order('created_at', { ascending: false });
+
+      if (filtroProgUsuario) {
+        query = query.contains('usuarios_asignados', [filtroProgUsuario]);
+      }
+
+      if (filtroProgEstado) {
+        query = query.eq('estado', filtroProgEstado);
+      }
+
+      const { data, error } = await query;
+
+      if (error) throw error;
+      
+      setTareasProgramadas(data || []);
+      setError(null);
+    } catch (err) {
+      console.error("Error cargando tareas programadas:", err);
+      setError("Error al cargar tareas programadas");
+    } finally {
+      setLoading(false);
+    }
+  };
+
 
   useEffect(() => {
     const handleResize = () => {
@@ -142,6 +182,9 @@ export default function Home({ usuario }) {
       setLoading(false);
     }
   };
+
+
+
 
   const borrarPedido = async (id) => {
     if (!window.confirm("¿Estás seguro de borrar este pedido?")) return;
@@ -221,6 +264,15 @@ export default function Home({ usuario }) {
     setShowTareasModal(true);
   };
 
+  const abrirModalProgramadas = (tareaExistente = null) => {
+    if (tareaExistente) {
+      modalTareasProgramadasRef.current?.abrirProgramada(tareaExistente);
+    } else {
+      modalTareasProgramadasRef.current?.abrirProgramada();
+    }
+    setShowProgramadasModal(true);
+  };
+
     // Función para abrir modal en modo edición
   const abrirModalEditarTarea = (tarea) => {
     setModoTarea('editar');
@@ -237,7 +289,7 @@ export default function Home({ usuario }) {
         pedidoSeleccionado
       ) {
         // Verificar si el clic no fue en un modal abierto
-        const isModalOpen = showPedidosModal || showTareasModal;
+        const isModalOpen = showPedidosModal || showTareasModal || showProgramadasModal ;
         const isNavbarClick = event.target.closest('.navbar') || 
                              event.target.closest('.offcanvas');
         
@@ -252,7 +304,7 @@ export default function Home({ usuario }) {
     return () => {
       document.removeEventListener('mousedown', handleClickOutside);
     };
-  }, [pedidoSeleccionado, showPedidosModal, showTareasModal]);
+  }, [pedidoSeleccionado, showPedidosModal, showTareasModal, showProgramadasModal]);
 
   const abrirModalEdicion = (pedido) => {
     setPedidoEditando(pedido);
@@ -268,6 +320,8 @@ export default function Home({ usuario }) {
     setShowPedidosModal(false);
     setPedidoEditando(null);
   };
+
+ 
 
   return (
     <div style={{ minHeight: "100vh", width: "100%", backgroundColor: "#2d3748", color: "white" }}>
@@ -289,13 +343,29 @@ export default function Home({ usuario }) {
         
         <div className="d-flex align-items-center gap-2" >
         {!pedidoSeleccionado ? (
- <button
-  className="btn btn-outline-secondary ms-3"
-  onClick={abrirNuevoPedido}
-  style={{ borderWidth: 'px', fontWeight: '700', fontSize: '1rem', color: '#a0aec0'}}
->
-  <i className="bi bi-plus-lg me-1" ></i> Pedido
-</button>
+         <>
+        <button
+          className="btn btn-outline-secondary me-1"
+          onClick={abrirNuevoPedido}
+          style={{ borderWidth: 'px', fontWeight: '600', fontSize: '1rem', color: '#a0aec0'}}
+        >
+          <i className="bi bi-clipboard-plus me-2" ></i> Pedido
+        </button>
+        <button
+          className="btn btn-outline-secondary me-1"
+  onClick={() => abrirModalProgramadas()}
+          style={{ borderWidth: 'px', fontWeight: '600', fontSize: '1rem', color: '#a0aec0'}}
+        >
+          <i className="bi bi-calendar2-plus" ></i> Programada
+        </button>
+        <button
+          className="btn btn-outline-secondary me-1"
+  
+          style={{ borderWidth: 'px', fontWeight: '600', fontSize: '1rem', color: '#a0aec0'}}
+        >
+          <i className="bi bi-journal-plus" ></i> Proyecto
+        </button>
+</> 
         ) : (
           <>
             {tareaSeleccionada ? (
@@ -513,7 +583,18 @@ export default function Home({ usuario }) {
               cerrarModalPedidos();
             }}
           />
-    
+       
+                 <ModalTareasProgramadas
+            ref={modalTareasProgramadasRef}
+            showModal={showProgramadasModal}
+            onClose={() => setShowProgramadasModal(false)}
+            onTareaGuardada={() => {
+              cargarProgramadas();
+              setShowProgramadasModal(false);
+            }}
+            tarea={null} // Puedes pasar una tarea existente aquí si estás editando
+          />
+
           {/* Modal de Tareas */}
           <ModalTareas
             showModal={showTareasModal}
@@ -557,7 +638,14 @@ export default function Home({ usuario }) {
     
                 const pedidosHoy = pedidos.filter(p => dayjs(p.created_at).isAfter(hoy));
                 const pedidosAyer = pedidos.filter(p => dayjs(p.created_at).isAfter(ayer) && dayjs(p.created_at).isBefore(hoy));
-                const pedidosAntiguos = pedidos.filter(p => dayjs(p.created_at).isBefore(ayer));
+                //const pedidosAntiguos = pedidos.filter(p => dayjs(p.created_at).isBefore(ayer));
+                //const ayer = dayjs().subtract(1, 'day').endOf('day');
+                const limiteAntiguedad = dayjs().subtract(4, 'day').startOf('day'); // 3 días antes de ayer
+
+                const pedidosAntiguos = pedidos.filter(p => {
+                const fechaPedido = dayjs(p.created_at);
+                return fechaPedido.isBefore(ayer) && fechaPedido.isAfter(limiteAntiguedad);
+                });
     
                 return (
                   <>
