@@ -12,8 +12,8 @@ dayjs.locale('es');
 const TarjetaProgramada = ({
   tarea,
   selected = false,
-  onSelect = () => {},
-  onComplete = () => {},
+  onSelect = () => { },
+  onComplete = () => { },
 }) => {
   const [creador, setCreador] = useState('');
   const [asignados, setAsignados] = useState([]);
@@ -30,7 +30,7 @@ const TarjetaProgramada = ({
           .select('Nombre')
           .eq('id_uuid', tarea.creado_por)
           .single();
-        
+
         if (creadorData) setCreador(creadorData.Nombre);
       }
 
@@ -39,7 +39,7 @@ const TarjetaProgramada = ({
           .from('usuarios')
           .select('Nombre')
           .in('id_uuid', tarea.usuarios_asignados);
-        
+
         if (asignadosData) {
           setAsignados(asignadosData.map(u => u.Nombre));
         }
@@ -53,20 +53,20 @@ const TarjetaProgramada = ({
   useEffect(() => {
     const calcularTiempoYEstado = () => {
       if (!tarea.fecha) return;
-      
+
       const ahora = dayjs();
       const fechaTarea = dayjs(tarea.fecha);
-      
-      const fechaCompleta = tarea.hora 
+
+      const fechaCompleta = tarea.hora
         ? fechaTarea.set('hour', tarea.hora.split(':')[0]).set('minute', tarea.hora.split(':')[1])
         : fechaTarea.startOf('day');
-      
+
       const diff = fechaCompleta.diff(ahora, 'minute');
 
       const dias = Math.floor(Math.abs(diff) / 1440);
       const horas = Math.floor((Math.abs(diff) % 1440) / 60);
       const minutos = Math.abs(diff) % 60;
-      
+
       const tiempoStr = `${dias > 0 ? `${dias}d ` : ''}${horas > 0 ? `${horas}h ` : ''}${minutos}m`;
 
       if (diff <= 0) {
@@ -83,53 +83,53 @@ const TarjetaProgramada = ({
 
     calcularTiempoYEstado();
     const interval = setInterval(calcularTiempoYEstado, 60000);
-//console.log(clearInterval(interval))
+    //console.log(clearInterval(interval))
     return () => clearInterval(interval);
   }, [tarea.fecha, tarea.hora, tarea.estado]);
 
   const marcarComoRealizada = async (e) => {
-        e.stopPropagation();
-        setLoading(true);
-        
-        try {
-            const { data, error } = await supabase
-            .from('programadas')
-            .update({ 
-                estado: 'Realizada',
-                //fecha_completado: new Date().toISOString()
-            })
-            .eq('id', tarea.id)
-            .select(); // Agrega esto para obtener más detalles del error
+    e.stopPropagation();
+    setLoading(true);
 
-            if (error) {
-            console.error('Detalles del error:', {
-                message: error.message,
-                details: error.details,
-                hint: error.hint,
-                code: error.code
-            });
-            throw error;
-            }
-            
-            setEstado('Realizada');
-            setTiempoRestante('Completada');
-            onComplete(tarea.id);
-        } catch (error) {
-            console.error('Error completo:', {
-            error: error,
-            tareaId: tarea.id,
-            datosEnviados: {
-                estado: 'Realizada'
-               // fecha_completado: new Date().toISOString()
-            }
-            });
-            alert('Error al marcar como realizada. Verifica la consola para más detalles.');
-        } finally {
-            setLoading(false);
+    try {
+      const { data, error } = await supabase
+        .from('programadas')
+        .update({
+          estado: 'Realizada',
+          //fecha_completado: new Date().toISOString()
+        })
+        .eq('id', tarea.id)
+        .select(); // Agrega esto para obtener más detalles del error
+
+      if (error) {
+        console.error('Detalles del error:', {
+          message: error.message,
+          details: error.details,
+          hint: error.hint,
+          code: error.code
+        });
+        throw error;
+      }
+
+      setEstado('Realizada');
+      setTiempoRestante('Completada');
+      onComplete(tarea.id);
+    } catch (error) {
+      console.error('Error completo:', {
+        error: error,
+        tareaId: tarea.id,
+        datosEnviados: {
+          estado: 'Realizada'
+          // fecha_completado: new Date().toISOString()
         }
-    };
+      });
+      alert('Error al marcar como realizada. Verifica la consola para más detalles.');
+    } finally {
+      setLoading(false);
+    }
+  };
 
-    
+
   const getEstadoStyles = () => {
     switch (estado) {
       case 'Realizada': return 'bg-success';
@@ -145,7 +145,7 @@ const TarjetaProgramada = ({
   };
 
   return (
-    <div 
+    <div
       className={`card mb-2 border-${selected ? 'primary' : 'secondary'}`}
       onClick={(e) => {
         if (e.target.tagName !== 'BUTTON' && !e.target.closest('button')) {
@@ -161,7 +161,7 @@ const TarjetaProgramada = ({
     >
       <div className="card-body p-3">
         <div className="d-flex justify-content-between align-items-start mb-2">
-            <i className="bi bi-calendar3 me-1 text-white"></i>
+          <i className="bi bi-calendar-event me-1 text-white"></i>
           <h6 className="card-title mb-0 text-white" style={{ fontSize: '1rem' }}>
             {tarea.descripcion}
           </h6>
@@ -173,12 +173,12 @@ const TarjetaProgramada = ({
 
         <div className="d-flex justify-content-between align-items-center">
           <small className="text-white">
-            
+
             {getFechaFormateada()}
           </small>
           <small className={
-            estado === 'Vencida' ? 'text-danger' : 
-            estado === 'Por vencer' ? 'text-warning' : 'text-success'
+            estado === 'Vencida' ? 'text-danger' :
+              estado === 'Por vencer' ? 'text-warning' : 'text-success'
           }>
             {tiempoRestante}
           </small>
@@ -196,35 +196,43 @@ const TarjetaProgramada = ({
             </div>
           </div>
         )}
-
-        {estado !== 'Realizada' && (
-          <div className="d-flex justify-content-end mt-2 text-white">
-            <button 
-              className="btn btn-sm btn-success"
-              onClick={marcarComoRealizada}
-              disabled={loading}
-            >
-              {loading ? (
-                <>
-                  <span className="spinner-border spinner-border-sm me-1" role="status" aria-hidden="true"></span>
-                  Procesando...
-                </>
-              ) : (
-                <>
-                  <i className="bi bi-check"></i> 
-                </>
-              )}
-            </button>
-          </div>
-        )}
-
         <div className="d-flex align-items-center mt-2 pt-2 border-top border-secondary text-white">
-          <small className="text-white">
-            Generó: {creador || 'usuario'}
-          </small>
-        </div>
+  <div className="d-flex justify-content-between align-items-center w-100">
+    <small className="text-white">
+      Generó: {creador || 'usuario'}
+    </small>
+    
+    {estado !== 'Realizada' && (
+      <button 
+        className="btn btn-sm btn-outline-success bg-transparent"
+        onClick={marcarComoRealizada}
+        disabled={loading}
+        style={{
+          borderWidth: '2px',
+          transition: 'all 0.3s ease',
+          // Estilos normales
+          ':hover': {
+            backgroundColor: 'rgba(40, 167, 69, 0.1)', // Verde muy transparente
+            borderColor: '#28a745',
+            color: '#28a745'
+          },
+          ':active': {
+            backgroundColor: 'rgba(40, 167, 69, 0.2)' // Verde un poco más opaco al hacer clic
+          }
+        }}
+      >
+        {loading ? (
+          <span className="spinner-border spinner-border-sm text-success" role="status" aria-hidden="true"></span>
+        ) : (
+          <i className="bi bi-check text-success"></i>
+        )}
+      </button>
+    )}
+  </div>
+</div>
       </div>
     </div>
+
   );
 };
 

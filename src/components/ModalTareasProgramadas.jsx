@@ -142,7 +142,7 @@ const guardarTareaProgramada = async () => {
     const tareaData = {
       descripcion,
       usuarios_asignados: usuariosSeleccionados.map(u => u.id),
-      estado: 'pendiente',
+      estado: 'Pendiente',
     };
 
     // Configuración de fechas/recurrencia
