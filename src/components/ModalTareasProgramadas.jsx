@@ -21,6 +21,7 @@ const ModalTareasProgramadas = forwardRef(({
   const [esRecurrente, setEsRecurrente] = useState(true);
   const modalRef = useRef(null);
   const modalInstance = useRef(null);
+  const [modalVisible, setModalVisible] = useState(false);
 
   useImperativeHandle(ref, () => ({
     abrirProgramada: (tarea = null) => {
@@ -32,10 +33,10 @@ const ModalTareasProgramadas = forwardRef(({
         
         if (tarea.dias_recurrencia) {
           setDiasRecurrencia(tarea.dias_recurrencia);
-          setHoraVencimiento(dayjs(tarea.vencimiento).format('HH:mm'));
+          setHoraVencimiento(dayjs(tarea.fechaVencimiento).format('HH:mm'));
         } else {
-          setFechaVencimiento(dayjs(tarea.vencimiento).format('YYYY-MM-DD'));
-          setHoraVencimiento(dayjs(tarea.vencimiento).format('HH:mm'));
+          setFechaVencimiento(dayjs(tarea.fecha_vencimiento).format('YYYY-MM-DD'));
+          setHoraVencimiento(dayjs(tarea.fecha_vencimiento).format('HH:mm'));
         }
       } else {
         // Resetear para nueva tarea
@@ -47,11 +48,13 @@ const ModalTareasProgramadas = forwardRef(({
         setEsRecurrente(true);
       }
       
+      setModalVisible(true);
       if (modalInstance.current) {
         modalInstance.current.show();
       }
     }
   }));
+
 
   // Cargar usuarios
   useEffect(() => {
@@ -108,66 +111,81 @@ const ModalTareasProgramadas = forwardRef(({
     setUsuariosSeleccionados(usuariosSeleccionados.filter(u => u.id !== id));
   };
 
+  
   const handleClose = () => {
-    modalInstance.current?.hide();
+    setModalVisible(false);
+    if (document.activeElement) {
+      document.activeElement.blur();
+    }
+    if (modalInstance.current) {
+      modalInstance.current.hide();
+    }
     onClose();
   };
 
-  const guardarTareaProgramada = async () => {
-    if (!descripcion.trim()) {
-      toast.error('La descripción no puede estar vacía');
-      return;
+
+const guardarTareaProgramada = async () => {
+  if (!descripcion.trim()) {
+    toast.error('La descripción no puede estar vacía');
+    return;
+  }
+
+  if (usuariosSeleccionados.length === 0) {
+    toast.error('Debes asignar al menos un usuario');
+    return;
+  }
+
+  try {
+    const { data: { user }, error: authError } = await supabase.auth.getUser();
+    if (authError || !user) throw new Error('No autenticado');
+
+    const tareaData = {
+      descripcion,
+      usuarios_asignados: usuariosSeleccionados.map(u => u.id),
+      estado: 'pendiente',
+    };
+
+    // Configuración de fechas/recurrencia
+    if (esRecurrente) {
+      tareaData.dias_recurrencia = diasRecurrencia;
+      tareaData.hora_ejecucion = horaVencimiento;
+      tareaData.proxima_ejecucion = `${dayjs().format('YYYY-MM-DD')}T${horaVencimiento}`;
+    } else {
+      //tareaData.fecha_vencimiento = fechaVencimiento;
+      //tareaData.hora_ejecucion = horaVencimiento;
+      tareaData.fecha_vencimiento = `${fechaVencimiento}T${horaVencimiento}:00`;
     }
 
-    if (usuariosSeleccionados.length === 0) {
-      toast.error('Debes asignar al menos un usuario');
-      return;
+    // Operación de guardado
+    let error;
+    if (tareaExistente) {
+      const { error: updateError } = await supabase
+        .from('programadas')
+        .update(tareaData)
+        .eq('id', tareaExistente.id);
+      error = updateError;
+      toast.success('Tarea programada actualizada');
+    } else {
+      tareaData.creado_por = user.id;
+      //tareaData.fecha_creacion = new Date().toISOString();
+      
+      const { error: insertError } = await supabase
+        .from('programadas')
+        .insert(tareaData)
+        .select(); // Añade .select() para obtener respuesta
+      error = insertError;
+      toast.success('Tarea programada creada');
     }
 
-    try {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) throw new Error('No autenticado');
+    if (error) throw error;
 
-      const tareaData = {
-        descripcion,
-        usuarios_asignados: usuariosSeleccionados.map(u => u.id),
-        estado: 'pendiente', // Estado por defecto
-      };
-
-      if (esRecurrente) {
-        tareaData.dias_recurrencia = diasRecurrencia;
-        tareaData.hora_ejecucion = horaVencimiento;
-        tareaData.proxima_ejecucion = dayjs().format('YYYY-MM-DD') + 'T' + horaVencimiento;
-      } else {
-        tareaData.fecha_vencimiento = fechaVencimiento;
-        tareaData.hora_vencimiento = horaVencimiento;
-        tareaData.vencimiento = `${fechaVencimiento}T${horaVencimiento}:00`;
-      }
-
-      if (tareaExistente) {
-        // Actualizar tarea existente
-        await supabase
-          .from('programadas')
-          .update(tareaData)
-          .eq('id', tareaExistente.id);
-        toast.success('Tarea programada actualizada');
-      } else {
-        // Crear nueva tarea
-        tareaData.creado_por = user.id;
-        tareaData.fecha_creacion = new Date().toISOString();
-        
-        await supabase
-          .from('programadas')
-          .insert(tareaData);
-        toast.success('Tarea programada creada');
-      }
-
-      onTareaGuardada();
-      handleClose();
-    } catch (error) {
-      toast.error(error.message || 'Error al guardar tarea programada');
-    }
-  };
+    onTareaGuardada();
+    handleClose();
+  } catch (error) {
+    console.error('Error completo:', error);
+    toast.error(error.message || 'Error al guardar tarea programada');
+  }
+};
 
   const eliminarTarea = async () => {
     if (!window.confirm('¿Estás seguro de eliminar esta tarea programada?')) return;
@@ -185,15 +203,15 @@ const ModalTareasProgramadas = forwardRef(({
       toast.error('Error al eliminar tarea programada');
     }
   };
-
-  return (
+  // Solución para el warning de keys en la lista de usuarios
+return (
     <div 
       ref={modalRef}
       className="modal fade" 
       id="modalTareasProgramadas"
       tabIndex="-1"
       aria-labelledby="modalTareasProgramadasTitle"
-      aria-hidden="true"
+      aria-hidden={!showModal}  // Cambiado para solucionar el warning de accesibilidad
     >
       <div className="modal-dialog modal-lg">
         <div className="modal-content bg-dark text-white">
@@ -231,6 +249,7 @@ const ModalTareasProgramadas = forwardRef(({
                   placeholder="Buscar usuarios..."
                   value={busquedaUsuario}
                   onChange={(e) => setBusquedaUsuario(e.target.value)}
+                  aria-label="Buscar usuarios" // Añadido para accesibilidad
                 />
               </div>
               
@@ -243,10 +262,11 @@ const ModalTareasProgramadas = forwardRef(({
                     )
                     .map(usuario => (
                       <button
-                        key={usuario.id}
+                        key={`usuario-${usuario.id}`} // Key única añadida
                         type="button"
                         className="list-group-item list-group-item-action bg-secondary text-white"
                         onClick={() => seleccionarUsuario(usuario)}
+                        aria-label={`Asignar a ${usuario.nombre}`} // Añadido para accesibilidad
                       >
                         {usuario.nombre} ({usuario.email})
                       </button>
@@ -256,21 +276,23 @@ const ModalTareasProgramadas = forwardRef(({
               
               <div className="d-flex flex-wrap gap-2">
                 {usuariosSeleccionados.map(usuario => (
-                  <span key={usuario.id} className="badge bg-primary d-flex align-items-center">
+                  <span key={`selected-${usuario.id}`} className="badge bg-primary d-flex align-items-center"> {/* Key única añadida */}
                     {usuario.nombre}
                     <button 
                       type="button"
                       className="btn-close btn-close-white ms-2"
-                      onClick={() => eliminarUsuario(usuario.id)}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        eliminarUsuario(usuario.id);
+                      }}
                       style={{ fontSize: '0.5rem' }}
-                      aria-label="Eliminar"
+                      aria-label={`Eliminar ${usuario.nombre}`} // Mejorado
                     />
                   </span>
                 ))}
               </div>
             </div>
-
-            <div className="mb-3">
+          <div className="mb-3">
               <div className="form-check form-switch">
                 <input
                   className="form-check-input"

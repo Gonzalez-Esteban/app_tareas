@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useRef } from "react";
+import React, { useEffect, useState, useRef, useMemo } from "react";
 import { Link } from "react-router-dom";
 import { supabase } from "../supabase/supabaseClient";
 import dayjs from 'dayjs';
@@ -11,6 +11,7 @@ import TarjetaPedidos from "../components/TarjetaPedidos";
 import ModalTareas from '../components/ModalTareas';
 import Pedidos from '../components/Pedidos';
 import ModalTareasProgramadas from '../components/ModalTareasProgramadas';
+import TarjetaProgramada from "../components/TarjetaProgramada";
 
 dayjs.extend(duration);
 dayjs.extend(utc);
@@ -44,6 +45,21 @@ export default function Home({ usuario }) {
   const [filtroProgUsuario, setFiltroProgUsuario] = useState(null);
   const modalTareasProgramadasRef = useRef();
   const [localRefresh, setLocalRefresh] = useState(0);
+  const [mostrarSoloPendientes, setMostrarSoloPendientes] = useState(false);
+
+
+// Filtrar y ordenar tareas
+const tareasFiltradas = useMemo(() => {
+  return tareasProgramadas
+    .filter(t => !mostrarSoloPendientes || t.estado !== 'Realizada')
+    .sort((a, b) => {
+      // Ordenar por prioridad (vencidas primero, luego por fecha más cercana)
+      const fechaA = dayjs(a.fecha + (a.hora ? `T${a.hora}` : ''));
+      const fechaB = dayjs(b.fecha + (b.hora ? `T${b.hora}` : ''));
+      return fechaA.diff(fechaB);
+    });
+}, [tareasProgramadas, mostrarSoloPendientes]);
+  
 
   useEffect(() => {
     inicializar();
@@ -468,10 +484,10 @@ export default function Home({ usuario }) {
         </div>
       </nav>
   
-{/* Contenido principal con sidebar colapsable */}
+{/* Sidebar modificado */}
 <div style={{ 
   display: 'flex', 
-  height: 'calc(180vh - 80px)', // Asegura altura completa restando altura del navbar
+  height: 'calc(180vh - 80px)',
   marginTop: '50px',
   position: 'static',
   overflow: 'hidden',
@@ -479,7 +495,7 @@ export default function Home({ usuario }) {
   width: '100%'
 }}>
   
-  {/* Sidebar mejorado */}
+  {/* Sidebar */}
   <div 
     className="sidebar-scroll"
     style={{
@@ -494,8 +510,8 @@ export default function Home({ usuario }) {
       flexDirection: 'column',
       borderTop: '1px solid #4a5568',
       height: '100%',
-      scrollbarWidth: 'thin',              // Firefox
-      scrollbarColor: '#444 #212529'       // Firefox
+      scrollbarWidth: 'thin',
+      scrollbarColor: '#444 #212529'
     }}
   >
     {/* Cabecera del sidebar */}
@@ -513,11 +529,8 @@ export default function Home({ usuario }) {
       minHeight: '40px'
     }}>
       {!isSidebarCollapsed && (
-        <h5 style={{ 
-          color: '#a0aec0',
-          whiteSpace: 'nowrap'
-        }}>
-          Pendientes
+        <h5 style={{ color: '#a0aec0', whiteSpace: 'nowrap' }}>
+          Tareas Programadas
         </h5>
       )}
       <button 
@@ -535,7 +548,67 @@ export default function Home({ usuario }) {
         <i className={`bi bi-chevron-${isSidebarCollapsed ? 'right' : 'left'}`}></i>
       </button>
     </div>
-    
+
+    {/* Botones de acción (solo cuando hay tarea seleccionada) */}
+    {!isSidebarCollapsed && tareaSeleccionada && (
+      <div style={{
+        padding: '10px',
+        borderBottom: '1px solid #4a5568',
+        display: 'flex',
+        gap: '8px',
+        justifyContent: 'flex-end'
+      }}>
+        <button 
+          className="btn btn-sm btn-outline-warning me-2"
+          onClick={() => abrirModalProgramadas(tareaSeleccionada)}
+        >
+          <i className="bi bi-pencil"></i> 
+        </button>
+        <button 
+          className="btn btn-sm btn-outline-danger me-2"
+          onClick={async () => {
+            if (window.confirm('¿Eliminar esta tarea programada?')) {
+              await supabase.from('programadas').delete().eq('id', tareaSeleccionada.id);
+              cargarProgramadas();
+              setTareaSeleccionada(null);
+            }
+          }}
+        >
+          <i className="bi bi-trash"></i> 
+        </button>
+      </div>
+    )}
+
+    {/* Filtro con toggle switch */}
+    {!isSidebarCollapsed && (
+      <div style={{ 
+        padding: '10px',
+        borderBottom: '1px solid #4a5568',
+        display: 'flex',
+        alignItems: 'center',
+        gap: '10px'
+      }}>
+        <div className="form-check form-switch">
+          <input 
+            className="form-check-input" 
+            type="checkbox" 
+            id="filtroPendientes"
+            checked={mostrarSoloPendientes}
+            onChange={() => setMostrarSoloPendientes(!mostrarSoloPendientes)}
+          />
+          <label className="form-check-label" htmlFor="filtroPendientes">
+            Solo pendientes
+          </label>
+        </div>
+        <button 
+          className="btn btn-sm btn-outline-primary ms-auto"
+          onClick={() => abrirModalProgramadas()}
+        >
+          <i className="bi bi-calendar2-plus"></i>
+        </button>
+      </div>
+    )}
+
     {/* Contenido del sidebar */}
     <div style={{ 
       flex: 1,
@@ -553,16 +626,47 @@ export default function Home({ usuario }) {
           height: '100%'
         }}>
           <i className="bi bi-calendar-event" style={{ fontSize: '1.2rem', marginBottom: '8px' }}></i>
+          {tareasProgramadas.length > 0 && (
+            <span className="badge bg-danger rounded-pill">
+              {tareasProgramadas.filter(t => t.estado !== 'Realizada').length}
+            </span>
+          )}
         </div>
       ) : (
-        <div style={{ color: '#a0aec0', flex: 1 }}>
-          <p>Sin tareas para hoy</p>
-        </div>
+        <>
+          {loading ? (
+            <div className="text-center my-4">
+              <div className="spinner-border spinner-border-sm text-light" role="status"></div>
+            </div>
+          ) : tareasFiltradas.length === 0 ? (
+            <div className="text-center py-4 text-muted">
+              <i className="bi bi-calendar-x" style={{ fontSize: '2rem' }}></i>
+              <p>No hay tareas {mostrarSoloPendientes ? 'pendientes' : 'programadas'}</p>
+            </div>
+          ) : (
+            <div className="d-flex flex-column gap-2">
+              {tareasFiltradas.map(tarea => (
+                <TarjetaProgramada
+                  key={tarea.id}
+                  tarea={tarea}
+                  selected={tareaSeleccionada?.id === tarea.id}
+                  onSelect={(id) => setTareaSeleccionada(tareasProgramadas.find(t => t.id === id))}
+                  onComplete={async (id) => {
+                    await supabase
+                      .from('programadas')
+                      .update({ estado: 'Realizada'})
+                      .eq('id', id);
+                    cargarProgramadas();
+                  }}
+                />
+              ))}
+            </div>
+          )}
+        </>
       )}
     </div>
   </div>
 
-  
         {/* Contenido principal (se mantiene igual) */}
         <div style={{
           flexGrow: 1,
