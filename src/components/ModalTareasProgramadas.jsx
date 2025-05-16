@@ -55,7 +55,6 @@ const ModalTareasProgramadas = forwardRef(({
     }
   }));
 
-
   // Cargar usuarios
   useEffect(() => {
     const cargarUsuarios = async () => {
@@ -111,7 +110,6 @@ const ModalTareasProgramadas = forwardRef(({
     setUsuariosSeleccionados(usuariosSeleccionados.filter(u => u.id !== id));
   };
 
-  
   const handleClose = () => {
     setModalVisible(false);
     if (document.activeElement) {
@@ -122,7 +120,6 @@ const ModalTareasProgramadas = forwardRef(({
     }
     onClose();
   };
-
 
 const guardarTareaProgramada = async () => {
   if (!descripcion.trim()) {
@@ -150,10 +147,11 @@ const guardarTareaProgramada = async () => {
       tareaData.dias_recurrencia = diasRecurrencia;
       tareaData.hora_ejecucion = horaVencimiento;
       tareaData.proxima_ejecucion = `${dayjs().format('YYYY-MM-DD')}T${horaVencimiento}`;
+      tareaData.fecha_vencimiento =  `${dayjs().format('YYYY-MM-DD')}T${horaVencimiento}`;
     } else {
       //tareaData.fecha_vencimiento = fechaVencimiento;
-      //tareaData.hora_ejecucion = horaVencimiento;
-      tareaData.fecha_vencimiento = `${fechaVencimiento}T${horaVencimiento}:00`;
+      tareaData.hora_ejecucion = horaVencimiento;
+      tareaData.fecha_vencimiento =  `${dayjs().format('YYYY-MM-DD')}T${horaVencimiento}`;
     }
 
     // Operación de guardado

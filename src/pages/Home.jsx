@@ -532,7 +532,7 @@ export default function Home({ usuario }) {
 
         {/* Sidebar */}
         <div
-          className="sidebar-scroll"
+          className="sidebar-scroll "
           style={{
             width: isSidebarCollapsed ? '50px' : '390px',
             backgroundColor: '#212529',
@@ -543,10 +543,11 @@ export default function Home({ usuario }) {
             borderRight: '1px solid #4a5568',
             display: 'flex',
             flexDirection: 'column',
-            borderTop: '1px solid #4a5568',
+            border: '1px solid #4a5568',
             height: '100%',
             scrollbarWidth: 'thin',
             scrollbarColor: '#444 #212529'
+            
           }}
         >
           {/* Cabecera del sidebar */}
@@ -630,18 +631,19 @@ export default function Home({ usuario }) {
                       checked={mostrarSoloPendientes}
                       onChange={() => setMostrarSoloPendientes(!mostrarSoloPendientes)}
                       style={{
-                        backgroundColor: mostrarSoloPendientes ? '#4a5568' : '#6c757d',
-                        borderColor: mostrarSoloPendientes ? '#4a5568' : '#6c757d',
+                        backgroundColor: mostrarSoloPendientes ?  '#a0aec0':'#4a5568' ,
+                        borderColor: mostrarSoloPendientes ?  '#a0aec0':'#4a5568' ,
                       }}
                     />
                     <label
                       className="form-check-label"
                       htmlFor="filtroPendientes"
                       style={{
-                        color: '#6c757d',
+                        color: '#a0aec0',
                         fontSize: '0.9rem',
                         fontWeight: '600',
                       }}
+                       
                     >
                       Pendientes
                     </label>
@@ -687,9 +689,9 @@ export default function Home({ usuario }) {
                     <div className="spinner-border spinner-border-sm text-light" role="status"></div>
                   </div>
                 ) : tareasFiltradas.length === 0 ? (
-                  <div className="text-center py-4 text-white">
+                  <div className="text-center py-4 text-secondary">
                     <i className="bi bi-calendar-x" style={{ fontSize: '2rem' }}></i>
-                    <p>No hay tareas {mostrarSoloPendientes ? 'pendientes' : 'programadas'}</p>
+                    <p>Sin tareas {mostrarSoloPendientes ? 'pendientes' : 'programadas'}</p>
                   </div>
                 ) : (
                   <div className="d-flex flex-column gap-2" ref={tareasContainerRef}>
@@ -775,7 +777,7 @@ export default function Home({ usuario }) {
               <div className="spinner-border text-primary" role="status">
                 <span className="visually-hidden">Cargando...</span>
               </div>
-              <p className="text-white mt-2">Cargando pedidos...</p>
+              <p className="text-secondary mt-2">Cargando pedidos...</p>
             </div>
           )}
 

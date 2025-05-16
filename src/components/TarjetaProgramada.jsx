@@ -20,6 +20,7 @@ const TarjetaProgramada = ({
   const [tiempoRestante, setTiempoRestante] = useState('');
   const [estado, setEstado] = useState(tarea.estado || 'Pendiente');
   const [loading, setLoading] = useState(false);
+  const [demora, setDemora] = useState(null);
 
   // Obtener información del creador y usuarios asignados
   useEffect(() => {
@@ -51,14 +52,18 @@ const TarjetaProgramada = ({
 
   // Calcular tiempo restante y estado automático
   useEffect(() => {
+    // Si la tarea ya está realizada, no calculamos tiempo
+    if (estado === 'Realizada') return;
+
     const calcularTiempoYEstado = () => {
-      if (!tarea.fecha) return;
+      if (!tarea.fecha_vencimiento) return;
 
       const ahora = dayjs();
-      const fechaTarea = dayjs(tarea.fecha);
+      const fechaTarea = dayjs(tarea.fecha_vencimiento);
 
-      const fechaCompleta = tarea.hora
-        ? fechaTarea.set('hour', tarea.hora.split(':')[0]).set('minute', tarea.hora.split(':')[1])
+      const fechaCompleta = tarea.fecha_vencimiento
+        ? fechaTarea.set('hour', tarea.hora_ejecucion?.split(':')[0] || 0)
+                   .set('minute', tarea.hora_ejecucion?.split(':')[1] || 0)
         : fechaTarea.startOf('day');
 
       const diff = fechaCompleta.diff(ahora, 'minute');
@@ -70,65 +75,61 @@ const TarjetaProgramada = ({
       const tiempoStr = `${dias > 0 ? `${dias}d ` : ''}${horas > 0 ? `${horas}h ` : ''}${minutos}m`;
 
       if (diff <= 0) {
-        setTiempoRestante(`Vencida hace ${tiempoStr}`);
+        setTiempoRestante(`${tiempoStr}`);
         setEstado(tarea.estado === 'Realizada' ? 'Realizada' : 'Vencida');
       } else if (diff <= 30) {
-        setTiempoRestante(`Por vencer en ${tiempoStr}`);
+        setTiempoRestante(`${tiempoStr}`);
         setEstado('Por vencer');
       } else {
-        setTiempoRestante(`Vence en ${tiempoStr}`);
+        setTiempoRestante(`${tiempoStr}`);
         setEstado('Pendiente');
       }
     };
 
     calcularTiempoYEstado();
-    const interval = setInterval(calcularTiempoYEstado, 60000);
-    //console.log(clearInterval(interval))
+    const interval = setInterval(calcularTiempoYEstado, 60000); // Actualizar cada minuto
+    
     return () => clearInterval(interval);
-  }, [tarea.fecha, tarea.hora, tarea.estado]);
+  }, [tarea.fecha_vencimiento, tarea.hora_ejecucion, estado]);
 
   const marcarComoRealizada = async (e) => {
     e.stopPropagation();
     setLoading(true);
 
     try {
+      // Calcular la demora (diferencia entre ahora y la fecha de vencimiento)
+      const ahora = dayjs();
+      const fechaVencimiento = dayjs(tarea.fecha_vencimiento)
+        .set('hour', tarea.hora_ejecucion?.split(':')[0] || 0)
+        .set('minute', tarea.hora_ejecucion?.split(':')[1] || 0);
+      
+      const minutosDemora = ahora.diff(fechaVencimiento, 'minute');
+      const demoraFormateada = minutosDemora > 0 ? 
+        `${Math.floor(minutosDemora / 1440)}d ${Math.floor((minutosDemora % 1440) / 60)}h ${minutosDemora % 60}m` : 
+        'A tiempo';
+
       const { data, error } = await supabase
         .from('programadas')
         .update({
           estado: 'Realizada',
-          //fecha_completado: new Date().toISOString()
+          //fecha_completado: new Date().toISOString(),
+          demora: minutosDemora > 0 ? minutosDemora : 0
         })
-        .eq('id', tarea.id)
-        .select(); // Agrega esto para obtener más detalles del error
+        .eq('id', tarea.id);
 
-      if (error) {
-        console.error('Detalles del error:', {
-          message: error.message,
-          details: error.details,
-          hint: error.hint,
-          code: error.code
-        });
-        throw error;
-      }
+      if (error) throw error;
 
       setEstado('Realizada');
       setTiempoRestante('Completada');
+      setDemora(demoraFormateada);
       onComplete(tarea.id);
     } catch (error) {
-      console.error('Error completo:', {
-        error: error,
-        tareaId: tarea.id,
-        datosEnviados: {
-          estado: 'Realizada'
-          // fecha_completado: new Date().toISOString()
-        }
-      });
-      alert('Error al marcar como realizada. Verifica la consola para más detalles.');
+      console.error('Error al marcar como realizada:', error);
+      alert('Error al marcar como realizada');
     } finally {
       setLoading(false);
     }
   };
-
 
   const getEstadoStyles = () => {
     switch (estado) {
@@ -140,13 +141,13 @@ const TarjetaProgramada = ({
   };
 
   const getFechaFormateada = () => {
-    if (!tarea.fecha) return '';
-    return dayjs(tarea.fecha).format('DD/MM/YYYY') + (tarea.hora ? ` a las ${tarea.hora}` : '');
+    if (!tarea.created_at) return '';
+    return dayjs(tarea.created_at).format('DD/MM/YYYY') + (tarea.hora_ejecucion ? ` a las ${tarea.hora_ejecucion}` : '');
   };
 
   return (
     <div
-      className={`card mb-2 border-${selected ? 'primary' : 'secondary'}`}
+      className={`card mb-2 border-${selected ? 'light' : 'secondary'}`}
       onClick={(e) => {
         if (e.target.tagName !== 'BUTTON' && !e.target.closest('button')) {
           onSelect(tarea.id);
@@ -161,33 +162,28 @@ const TarjetaProgramada = ({
     >
       <div className="card-body p-3">
         <div className="d-flex justify-content-between align-items-start mb-2">
-          <i className="bi bi-calendar-event me-1 text-white"></i>
-          <h6 className="card-title mb-0 text-white" style={{ fontSize: '1rem' }}>
+          <i className="bi bi-calendar-event me-1 text-white"></i>   
+          <h6 className="card-title mb-0 text-white" style={{ fontSize: '1rem'}}>
             {tarea.descripcion}
           </h6>
-          <span className={`badge ${getEstadoStyles()}`}>
-            {estado}
-          </span>
-        </div>
-
-
-        <div className="d-flex justify-content-between align-items-center">
-          <small className="text-white">
-
-            {getFechaFormateada()}
-          </small>
-          <small className={
-            estado === 'Vencida' ? 'text-danger' :
-              estado === 'Por vencer' ? 'text-warning' : 'text-success'
-          }>
-            {tiempoRestante}
-          </small>
+          <div className="d-flex flex-column align-items-end">
+            <span className={`badge ${getEstadoStyles()} mb-1`}>
+              {estado} 
+            </span>
+            <small className={
+              estado === 'Vencida' ? 'text-danger' :
+              estado === 'Por vencer' ? 'text-warning' : 
+              estado === 'Realizada' ? 'text-success' : 'text-white'
+            } style={{ fontWeight: '650', fontSize: '0.7rem'}}>
+              {estado === 'Realizada' ? (demora || '0m') : `${tiempoRestante}`}
+            </small>
+          </div>       
         </div>
 
         {asignados.length > 0 && (
-          <div className="mb-2">
-            <small className="text-white d-block mb-1">Asignado:</small>
-            <div className="d-flex flex-wrap gap-1">
+          <div className="mb-2 d-flex align-items-center">
+            <i className="bi bi-people-fill me-2 text-white"></i>
+            <div className="d-flex flex-wrap gap-1 align-items-center">
               {asignados.map((nombre, index) => (
                 <span key={index} className="badge bg-secondary">
                   {nombre}
@@ -196,43 +192,34 @@ const TarjetaProgramada = ({
             </div>
           </div>
         )}
-        <div className="d-flex align-items-center mt-2 pt-2 border-top border-secondary text-white">
-  <div className="d-flex justify-content-between align-items-center w-100">
-    <small className="text-white">
-      Generó: {creador || 'usuario'}
-    </small>
-    
-    {estado !== 'Realizada' && (
-      <button 
-        className="btn btn-sm btn-outline-success bg-transparent"
-        onClick={marcarComoRealizada}
-        disabled={loading}
-        style={{
-          borderWidth: '2px',
-          transition: 'all 0.3s ease',
-          // Estilos normales
-          ':hover': {
-            backgroundColor: 'rgba(40, 167, 69, 0.1)', // Verde muy transparente
-            borderColor: '#28a745',
-            color: '#28a745'
-          },
-          ':active': {
-            backgroundColor: 'rgba(40, 167, 69, 0.2)' // Verde un poco más opaco al hacer clic
-          }
-        }}
-      >
-        {loading ? (
-          <span className="spinner-border spinner-border-sm text-success" role="status" aria-hidden="true"></span>
-        ) : (
-          <i className="bi bi-check text-success"></i>
-        )}
-      </button>
-    )}
-  </div>
-</div>
+        
+        <div className="d-flex align-items-center mt-2 pt-2 border-top border-secondary">
+          <div className="d-flex justify-content-between align-items-center w-100 text-white">
+            <div className="d-flex flex-column">
+              <small className="text-white">
+                Generó: {creador || 'usuario'}
+              </small>
+              <small className="text-white" style={{ fontSize: '0.8rem', color: '#a0aec0' }}>
+                {getFechaFormateada()}
+              </small>
+            </div>
+            {estado !== 'Realizada' && (
+              <button 
+                className="btn btn-sm btn-outline-success me-2"
+                onClick={marcarComoRealizada}
+                disabled={loading}
+              >
+                {loading ? (
+                  <span className="spinner-border spinner-border-sm text-success" role="status" aria-hidden="true"></span>
+                ) : (
+                  <i className="bi bi-check"></i>
+                )}
+              </button>
+            )}
+          </div>
+        </div>
       </div>
     </div>
-
   );
 };
 
