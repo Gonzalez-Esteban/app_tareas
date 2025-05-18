@@ -696,23 +696,22 @@ export default function Home({ usuario }) {
                 ) : (
                   <div className="d-flex flex-column gap-2" ref={tareasContainerRef}>
                     {tareasFiltradas.map(tarea => (
-                      <TarjetaProgramada
-                        key={tarea.id}
-                        tarea={tarea}
-                        selected={tareaSeleccionada?.id === tarea.id}
-                        onSelect={(id) => setTareaSeleccionada(tareasProgramadas.find(t => t.id === id))}
-                        onComplete={async (id) => {
-                          await supabase
-                            .from('programadas')
-                            .update({ estado: 'Realizada' })
-                            .eq('id', id);
-                          cargarProgramadas();
-                          // Deseleccionar si era la tarea seleccionada
-                          if (tareaSeleccionada?.id === id) {
-                            setTareaSeleccionada(null);
-                          }
-                        }}
-                      />
+                 <TarjetaProgramada
+                    key={tarea.id}
+                    tarea={tarea}
+                    selected={tareaSeleccionada?.id === tarea.id}
+                    onSelect={(id) => setTareaSeleccionada(tareasProgramadas.find(t => t.id === id))}
+                    onComplete={async (id, nuevoEstado) => {  // <- Añade nuevoEstado como parámetro
+                      await supabase
+                        .from('programadas')
+                        .update({ estado: nuevoEstado })  // <- Usa nuevoEstado en lugar de 'Realizada'
+                        .eq('id', id);
+                      cargarProgramadas();
+                      if (tareaSeleccionada?.id === id) {
+                        setTareaSeleccionada(null);
+                      }
+                    }}
+                  />
                     ))}
                   </div>
                 )}
