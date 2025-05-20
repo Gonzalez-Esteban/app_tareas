@@ -15,10 +15,10 @@ const ModalTareasProgramadas = forwardRef(({
   const [busquedaUsuario, setBusquedaUsuario] = useState('');
   const [usuariosSeleccionados, setUsuariosSeleccionados] = useState([]);
   const [cargando, setCargando] = useState(true);
-  const [horaVencimiento, setHoraVencimiento] = useState('09:00');
-  const [diasRecurrencia, setDiasRecurrencia] = useState(1);
+  const [horaEjecucion, setHoraEjecucion] = useState('09:00');
   const [fechaVencimiento, setFechaVencimiento] = useState(dayjs().add(1, 'day').format('YYYY-MM-DD'));
-  const [esRecurrente, setEsRecurrente] = useState(true);
+  const [tipoRecurrencia, setTipoRecurrencia] = useState('diaria');
+  const [diasRecurrencia, setDiasRecurrencia] = useState(1);
   const modalRef = useRef(null);
   const modalInstance = useRef(null);
   const [modalVisible, setModalVisible] = useState(false);
@@ -29,23 +29,21 @@ const ModalTareasProgramadas = forwardRef(({
         // Cargar datos de la tarea existente
         setDescripcion(tarea.descripcion);
         setUsuariosSeleccionados(tarea.usuarios_asignados || []);
-        setEsRecurrente(tarea.dias_recurrencia ? true : false);
+        setTipoRecurrencia(tarea.tipo_recurrencia || 'diaria');
+        setDiasRecurrencia(tarea.dias_recurrencia || 1);
         
-        if (tarea.dias_recurrencia) {
-          setDiasRecurrencia(tarea.dias_recurrencia);
-          setHoraVencimiento(dayjs(tarea.fechaVencimiento).format('HH:mm'));
-        } else {
-          setFechaVencimiento(dayjs(tarea.fecha_vencimiento).format('YYYY-MM-DD'));
-          setHoraVencimiento(dayjs(tarea.fecha_vencimiento).format('HH:mm'));
-        }
+        // Parsear fecha y hora
+        const fechaHora = dayjs(tarea.fecha_vencimiento);
+        setFechaVencimiento(fechaHora.format('YYYY-MM-DD'));
+        setHoraEjecucion(tarea.hora_ejecucion || '09:00');
       } else {
         // Resetear para nueva tarea
         setDescripcion('');
         setUsuariosSeleccionados([]);
-        setHoraVencimiento(dayjs().add(1, 'hour').format('HH:mm'));
+        setTipoRecurrencia('diaria');
         setDiasRecurrencia(1);
+        setHoraEjecucion('09:00');
         setFechaVencimiento(dayjs().add(1, 'day').format('YYYY-MM-DD'));
-        setEsRecurrente(true);
       }
       
       setModalVisible(true);
@@ -121,95 +119,106 @@ const ModalTareasProgramadas = forwardRef(({
     onClose();
   };
 
-const guardarTareaProgramada = async () => {
-  if (!descripcion.trim()) {
-    toast.error('La descripción no puede estar vacía');
-    return;
-  }
-
-  if (usuariosSeleccionados.length === 0) {
-    toast.error('Debes asignar al menos un usuario');
-    return;
-  }
-
-  try {
-    const { data: { user }, error: authError } = await supabase.auth.getUser();
-    if (authError || !user) throw new Error('No autenticado');
-
-    const tareaData = {
-      descripcion,
-      usuarios_asignados: usuariosSeleccionados.map(u => u.id),
-      estado: 'Pendiente',
-    };
-
-    // Configuración de fechas/recurrencia
-    if (esRecurrente) {
-      tareaData.dias_recurrencia = diasRecurrencia;
-      tareaData.hora_ejecucion = horaVencimiento;
-      tareaData.proxima_ejecucion = `${dayjs().format('YYYY-MM-DD')}T${horaVencimiento}`;
-      tareaData.fecha_vencimiento =  `${dayjs().format('YYYY-MM-DD')}T${horaVencimiento}`;
-    } else {
-      //tareaData.fecha_vencimiento = fechaVencimiento;
-      tareaData.hora_ejecucion = horaVencimiento;
-      tareaData.fecha_vencimiento =  `${dayjs().format('YYYY-MM-DD')}T${horaVencimiento}`;
+  const calcularProximaFecha = (fechaBase) => {
+    const fecha = dayjs(fechaBase);
+    
+    switch(tipoRecurrencia) {
+      case 'diaria':
+        return fecha.add(1, 'day').toISOString();
+      case 'semanal':
+        return fecha.add(1, 'week').toISOString();
+      case 'mensual':
+        return fecha.add(1, 'month').toISOString();
+      default:
+        return fecha.toISOString();
+    }
+  };
+  
+  const guardarTareaProgramada = async () => {
+    if (!descripcion.trim()) {
+      toast.error('La descripción no puede estar vacía');
+      return;
     }
 
-    // Operación de guardado
-    let error;
-    if (tareaExistente) {
-      const { error: updateError } = await supabase
-        .from('programadas')
-        .update(tareaData)
-        .eq('id', tareaExistente.id);
-      error = updateError;
-      toast.success('Tarea programada actualizada');
-    } else {
-      tareaData.creado_por = user.id;
-      //tareaData.fecha_creacion = new Date().toISOString();
-      
-      const { error: insertError } = await supabase
-        .from('programadas')
-        .insert(tareaData)
-        .select(); // Añade .select() para obtener respuesta
-      error = insertError;
-      toast.success('Tarea programada creada');
+    if (usuariosSeleccionados.length === 0) {
+      toast.error('Debes asignar al menos un usuario');
+      return;
     }
 
-    if (error) throw error;
+    try {
+      const { data: { user }, error: authError } = await supabase.auth.getUser();
+      if (authError || !user) throw new Error('No autenticado');
 
-    onTareaGuardada();
-    handleClose();
-  } catch (error) {
-    console.error('Error completo:', error);
-    toast.error(error.message || 'Error al guardar tarea programada');
-  }
-};
+      const fechaHoraCompleta = `${fechaVencimiento}T${horaEjecucion}:00`;;
+      const proximaEjecucion = tipoRecurrencia === 'única' ? fechaHoraCompleta : calcularProximaFecha(fechaHoraCompleta);
+
+      const tareaData = {
+        descripcion,
+        usuarios_asignados: usuariosSeleccionados.map(u => u.id),
+        fecha_vencimiento: fechaHoraCompleta,
+        hora_ejecucion: horaEjecucion,
+        tipo_recurrencia: tipoRecurrencia,
+        proxima_ejecucion: proximaEjecucion,
+        dias_recurrencia: tipoRecurrencia === 'diaria' ? diasRecurrencia : null,
+        activa: true
+      };
+
+      // Operación de guardado
+      let error;
+      if (tareaExistente) {
+        const { error: updateError } = await supabase
+          .from('programadas')
+          .update(tareaData)
+          .eq('id', tareaExistente.id);
+        error = updateError;
+        toast.success('Tarea programada actualizada');
+      } else {
+        tareaData.creado_por = user.id;
+        
+        const { error: insertError } = await supabase
+          .from('programadas')
+          .insert(tareaData)
+          .select();
+        error = insertError;
+        toast.success('Tarea programada creada');
+      }
+
+      if (error) throw error;
+
+      onTareaGuardada();
+      handleClose();
+    } catch (error) {
+      console.error('Error al guardar tarea:', error);
+      toast.error(error.message || 'Error al guardar tarea programada');
+    }
+  };
 
   const eliminarTarea = async () => {
     if (!window.confirm('¿Estás seguro de eliminar esta tarea programada?')) return;
 
     try {
+      // Desactivar en lugar de eliminar
       await supabase
         .from('programadas')
-        .delete()
+        .update({ activa: false })
         .eq('id', tareaExistente.id);
       
-      toast.success('Tarea programada eliminada');
+      toast.success('Tarea programada desactivada');
       onTareaGuardada();
       handleClose();
     } catch (error) {
-      toast.error('Error al eliminar tarea programada');
+      toast.error('Error al desactivar tarea programada');
     }
   };
-  // Solución para el warning de keys en la lista de usuarios
-return (
+
+  return (
     <div 
       ref={modalRef}
       className="modal fade" 
       id="modalTareasProgramadas"
       tabIndex="-1"
       aria-labelledby="modalTareasProgramadasTitle"
-      aria-hidden={!showModal}  // Cambiado para solucionar el warning de accesibilidad
+      aria-hidden={!showModal}
     >
       <div className="modal-dialog modal-lg">
         <div className="modal-content bg-dark text-white">
@@ -247,7 +256,7 @@ return (
                   placeholder="Buscar usuarios..."
                   value={busquedaUsuario}
                   onChange={(e) => setBusquedaUsuario(e.target.value)}
-                  aria-label="Buscar usuarios" // Añadido para accesibilidad
+                  aria-label="Buscar usuarios"
                 />
               </div>
               
@@ -260,11 +269,11 @@ return (
                     )
                     .map(usuario => (
                       <button
-                        key={`usuario-${usuario.id}`} // Key única añadida
+                        key={`usuario-${usuario.id}`}
                         type="button"
                         className="list-group-item list-group-item-action bg-secondary text-white"
                         onClick={() => seleccionarUsuario(usuario)}
-                        aria-label={`Asignar a ${usuario.nombre}`} // Añadido para accesibilidad
+                        aria-label={`Asignar a ${usuario.nombre}`}
                       >
                         {usuario.nombre} ({usuario.email})
                       </button>
@@ -274,7 +283,7 @@ return (
               
               <div className="d-flex flex-wrap gap-2">
                 {usuariosSeleccionados.map(usuario => (
-                  <span key={`selected-${usuario.id}`} className="badge bg-primary d-flex align-items-center"> {/* Key única añadida */}
+                  <span key={`selected-${usuario.id}`} className="badge bg-primary d-flex align-items-center">
                     {usuario.nombre}
                     <button 
                       type="button"
@@ -284,79 +293,62 @@ return (
                         eliminarUsuario(usuario.id);
                       }}
                       style={{ fontSize: '0.5rem' }}
-                      aria-label={`Eliminar ${usuario.nombre}`} // Mejorado
+                      aria-label={`Eliminar ${usuario.nombre}`}
                     />
                   </span>
                 ))}
               </div>
             </div>
-          <div className="mb-3">
-              <div className="form-check form-switch">
+
+            <div className="row mb-3">
+              <div className="col-md-6">
+                <label className="form-label">Fecha de inicio:</label>
                 <input
-                  className="form-check-input"
-                  type="checkbox"
-                  id="esRecurrenteSwitch"
-                  checked={esRecurrente}
-                  onChange={() => setEsRecurrente(!esRecurrente)}
+                  type="date"
+                  className="form-control bg-secondary text-white border-dark"
+                  value={fechaVencimiento}
+                  min={dayjs().format('YYYY-MM-DD')}
+                  onChange={(e) => setFechaVencimiento(e.target.value)}
+                  required
                 />
-                <label className="form-check-label" htmlFor="esRecurrenteSwitch">
-                  Repetir tarea
-                </label>
+              </div>
+              <div className="col-md-6">
+                <label className="form-label">Hora de ejecución:</label>
+                <input
+                  type="time"
+                  className="form-control bg-secondary text-white border-dark"
+                  value={horaEjecucion}
+                  onChange={(e) => setHoraEjecucion(e.target.value)}
+                  required
+                />
               </div>
             </div>
 
-            {esRecurrente ? (
+            <div className="mb-3">
+              <label className="form-label">Tipo de recurrencia:</label>
+              <select
+                className="form-select bg-secondary text-white border-dark"
+                value={tipoRecurrencia}
+                onChange={(e) => setTipoRecurrencia(e.target.value)}
+              >
+                <option value="única">Única (no se repite)</option>
+                <option value="diaria">Diaria</option>
+                <option value="semanal">Semanal</option>
+                <option value="mensual">Mensual</option>
+              </select>
+            </div>
+
+            {tipoRecurrencia === 'diaria' && (
               <div className="mb-3">
-                <div className="row g-3">
-                  <div className="col-md-6">
-                    <label>Repetir cada (días):</label>
-                    <input
-                      type="number"
-                      className="form-control bg-secondary text-white border-dark"
-                      min="1"
-                      max="30"
-                      value={diasRecurrencia}
-                      onChange={(e) => setDiasRecurrencia(Number(e.target.value))}
-                      required
-                    />
-                  </div>
-                  <div className="col-md-6">
-                    <label>Hora de ejecución:</label>
-                    <input
-                      type="time"
-                      className="form-control bg-secondary text-white border-dark"
-                      value={horaVencimiento}
-                      onChange={(e) => setHoraVencimiento(e.target.value)}
-                      required
-                    />
-                  </div>
-                </div>
-              </div>
-            ) : (
-              <div className="mb-3">
-                <div className="row g-3">
-                  <div className="col-md-6">
-                    <label>Fecha de vencimiento:</label>
-                    <input
-                      type="date"
-                      className="form-control bg-secondary text-white border-dark"
-                      value={fechaVencimiento}
-                      min={dayjs().format('YYYY-MM-DD')}
-                      onChange={(e) => setFechaVencimiento(e.target.value)}
-                      required
-                    />
-                  </div>
-                  <div className="col-md-6">
-                    <label>Hora de vencimiento:</label>
-                    <input
-                      type="time"
-                      className="form-control bg-secondary text-white border-dark"
-                      value={horaVencimiento}
-                      onChange={(e) => setHoraVencimiento(e.target.value)}
-                      required
-                    />
-                  </div>
-                </div>
+                <label className="form-label">Cada cuántos días:</label>
+                <input
+                  type="number"
+                  className="form-control bg-secondary text-white border-dark"
+                  min="1"
+                  max="30"
+                  value={diasRecurrencia}
+                  onChange={(e) => setDiasRecurrencia(Number(e.target.value))}
+                />
               </div>
             )}
 
@@ -375,7 +367,7 @@ return (
                 className="btn btn-danger w-100 mt-2"
                 onClick={eliminarTarea}
               >
-                <i className="bi bi-trash me-2"></i> Eliminar Tarea
+                <i className="bi bi-trash me-2"></i> {tareaExistente.activa ? 'Desactivar' : 'Eliminar'} Tarea
               </button>
             )}
           </div>

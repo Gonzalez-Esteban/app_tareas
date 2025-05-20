@@ -133,36 +133,56 @@ export default function Home({ usuario }) {
     return () => clearInterval(interval);
   }, []);
 
-  const cargarProgramadas = async () => {
-    setLoading(true);
-    try {
-      let query = supabase
-        .from('programadas')
-        .select('*')
-        .order('created_at', { ascending: false });
+const cargarProgramadas = async () => {
+  setLoading(true);
+  try {
+let query = supabase
 
-      if (filtroProgUsuario) {
-        query = query.contains('usuarios_asignados', [filtroProgUsuario]);
-      }
+  .from('registro_programadas')
+  .select(`
+    *,
+    programadas: id_prog (*) 
+  `)
+  .eq('estado', 'pendiente');
 
-      if (filtroProgEstado) {
-        query = query.eq('estado', filtroProgEstado);
-      }
-
-      const { data, error } = await query;
-
-      if (error) throw error;
-
-      setTareasProgramadas(data || []);
-      setError(null);
-    } catch (err) {
-      console.error("Error cargando tareas programadas:", err);
-      setError("Error al cargar tareas programadas");
-    } finally {
-      setLoading(false);
+    if (filtroProgUsuario) {
+      query = query.contains('usuarios_asignados', [filtroProgUsuario]);
     }
-  };
 
+    if (filtroProgEstado) {
+      query = query.eq('estado', filtroProgEstado);
+    }
+
+    const { data, error } = await query;
+
+    if (error) throw error;
+
+    setTareasProgramadas(data || []);
+    setError(null);
+  } catch (err) {
+    console.error("Error cargando tareas programadas:", err);
+    setError("Error al cargar tareas programadas");
+  } finally {
+    setLoading(false);
+  }
+};
+
+const calcularProximaFecha = (tarea) => {
+  if (!tarea?.fecha_vencimiento) return null;
+
+  const fechaActual = dayjs(tarea.fecha_vencimiento);
+  
+  switch(tarea.tipo_recurrencia) {
+    case 'diaria':
+      return fechaActual.add(tarea.intervalo_recurrencia || 1, 'day').toISOString();
+    case 'semanal':
+      return fechaActual.add(tarea.intervalo_recurrencia || 1, 'week').toISOString();
+    case 'mensual':
+      return fechaActual.add(tarea.intervalo_recurrencia || 1, 'month').toISOString();
+    default:
+      return null; // Si no es recurrente, no calcula próxima fecha
+  }
+};
 
   useEffect(() => {
     const handleResize = () => {
@@ -234,9 +254,48 @@ export default function Home({ usuario }) {
     }
   };
 
+  const cargarTareasPendientes = async () => {
+    setLoading(true);
+    try {
+      const { data, error } = await supabase
+        .from('registro_programadas')
+        .select(`
+          *,
+          programada: id_programada (
+            *,
+            historial: registro_programadas (
+              *,
+              usuario: create_for (*)
+            )
+          )
+        `)
+        .eq('estado', 'pendiente')
+        .order('fecha_ejecucion', { ascending: true });
 
+      if (error) throw error;
+      setTareasProgramadas(data || []);
+    } catch (err) {
+      console.error("Error cargando tareas:", err);
+      setError("Error al cargar tareas");
+    } finally {
+      setLoading(false);
+    }
+  };
 
-
+  const completarTarea = async (idRegistro, estado) => {
+  try {
+    // Actualizar registro
+    await supabase
+      .from('registro_programadas')
+      .update({ estado })
+      .eq('id', idRegistro);
+    
+    // Recargar tareas
+    await cargarTareasPendientes();
+  } catch (error) {
+    console.error("Error completando tarea:", error);
+  }
+};
   const borrarPedido = async (id) => {
     if (!window.confirm("¿Estás seguro de borrar este pedido?")) return;
 
@@ -696,22 +755,57 @@ export default function Home({ usuario }) {
                 ) : (
                   <div className="d-flex flex-column gap-2" ref={tareasContainerRef}>
                     {tareasFiltradas.map(tarea => (
-                 <TarjetaProgramada
-                    key={tarea.id}
-                    tarea={tarea}
-                    selected={tareaSeleccionada?.id === tarea.id}
-                    onSelect={(id) => setTareaSeleccionada(tareasProgramadas.find(t => t.id === id))}
-                    onComplete={async (id, nuevoEstado) => {  // <- Añade nuevoEstado como parámetro
-                      await supabase
-                        .from('programadas')
-                        .update({ estado: nuevoEstado })  // <- Usa nuevoEstado en lugar de 'Realizada'
-                        .eq('id', id);
-                      cargarProgramadas();
-                      if (tareaSeleccionada?.id === id) {
-                        setTareaSeleccionada(null);
-                      }
-                    }}
-                  />
+<TarjetaProgramada
+  key={tarea.id}
+  tarea={tarea}
+  selected={tareaSeleccionada?.id === tarea.id}
+  onSelect={(id) => setTareaSeleccionada(tareasProgramadas.find(t => t.id === id))}
+  onComplete={async (id, nuevoEstado) => {
+    const tarea = tareasProgramadas.find(t => t.id === id);
+    
+    // 1. Actualización optimista
+    setTareasProgramadas(prev => prev.map(t => 
+      t.id === id ? { ...t, estado: nuevoEstado } : t
+    ));
+    
+    try {
+      // 2. Registrar en historial
+      await supabase.from('historial_tareas').insert({
+        tarea_id: id,
+        fecha_programada: tarea.fecha_vencimiento,
+        fecha_ejecucion: new Date().toISOString(),
+        estado: nuevoEstado,
+        usuario_id: usuario.id_uuid
+      });
+
+      // 3. Si es recurrente, actualizar próxima fecha
+      if (nuevoEstado === 'completada' && tarea.tipo_recurrencia && tarea.tipo_recurrencia !== 'única') {
+        const proximaFecha = calcularProximaFecha(tarea);
+        
+        if (proximaFecha) {
+          await supabase
+            .from('programadas')
+            .update({
+              fecha_vencimiento: proximaFecha,
+              estado: 'pendiente',
+              ultima_ejecucion: new Date().toISOString()
+            })
+            .eq('id', id);
+        }
+      }
+
+      // 4. Recargar datos
+      await cargarProgramadas();
+      
+    } catch (error) {
+      console.error("Error al actualizar tarea:", error);
+      // Revertir en caso de error
+      setTareasProgramadas(prev => prev.map(t => 
+        t.id === id ? { ...t, estado: tarea.estado } : t
+      ));
+    }
+  }}
+/>
                     ))}
                   </div>
                 )}
