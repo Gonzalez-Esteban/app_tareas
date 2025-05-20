@@ -134,64 +134,65 @@ const ModalTareasProgramadas = forwardRef(({
     }
   };
   
-  const guardarTareaProgramada = async () => {
-    if (!descripcion.trim()) {
-      toast.error('La descripción no puede estar vacía');
-      return;
+const guardarTareaProgramada = async () => {
+  if (!descripcion.trim()) {
+    toast.error('La descripción no puede estar vacía');
+    return;
+  }
+
+  if (usuariosSeleccionados.length === 0) {
+    toast.error('Debes asignar al menos un usuario');
+    return;
+  }
+
+  try {
+    const { data: { user }, error: authError } = await supabase.auth.getUser();
+    if (authError || !user) throw new Error('No autenticado');
+
+    const fechaHoraCompleta = `${fechaVencimiento}T${horaEjecucion}:00`;
+    const proximaEjecucion = tipoRecurrencia === 'única'
+      ? fechaHoraCompleta
+      : calcularProximaFecha(fechaHoraCompleta);
+
+    const tareaData = {
+      descripcion,
+      usuarios_asignados: usuariosSeleccionados.map(u => u.id),
+      fecha_vencimiento: fechaHoraCompleta,
+      hora_ejecucion: horaEjecucion,
+      tipo_recurrencia: tipoRecurrencia,
+      proxima_ejecucion: proximaEjecucion,
+      dias_recurrencia: tipoRecurrencia === 'diaria' ? diasRecurrencia : null,
+      estado: 'Pendiente',
+      activa: true
+    };
+
+    let error;
+    if (tareaExistente) {
+      const { error: updateError } = await supabase
+        .from('programadas')
+        .update(tareaData)
+        .eq('id', tareaExistente.id);
+      error = updateError;
+      toast.success('Tarea programada actualizada');
+    } else {
+      tareaData.creado_por = user.id;
+
+      const { error: insertError } = await supabase
+        .from('programadas')
+        .insert(tareaData); // No hace falta select() si no usas el ID
+      error = insertError;
+      toast.success('Tarea programada creada');
     }
 
-    if (usuariosSeleccionados.length === 0) {
-      toast.error('Debes asignar al menos un usuario');
-      return;
-    }
+    if (error) throw error;
 
-    try {
-      const { data: { user }, error: authError } = await supabase.auth.getUser();
-      if (authError || !user) throw new Error('No autenticado');
-
-      const fechaHoraCompleta = `${fechaVencimiento}T${horaEjecucion}:00`;;
-      const proximaEjecucion = tipoRecurrencia === 'única' ? fechaHoraCompleta : calcularProximaFecha(fechaHoraCompleta);
-
-      const tareaData = {
-        descripcion,
-        usuarios_asignados: usuariosSeleccionados.map(u => u.id),
-        fecha_vencimiento: fechaHoraCompleta,
-        hora_ejecucion: horaEjecucion,
-        tipo_recurrencia: tipoRecurrencia,
-        proxima_ejecucion: proximaEjecucion,
-        dias_recurrencia: tipoRecurrencia === 'diaria' ? diasRecurrencia : null,
-        activa: true
-      };
-
-      // Operación de guardado
-      let error;
-      if (tareaExistente) {
-        const { error: updateError } = await supabase
-          .from('programadas')
-          .update(tareaData)
-          .eq('id', tareaExistente.id);
-        error = updateError;
-        toast.success('Tarea programada actualizada');
-      } else {
-        tareaData.creado_por = user.id;
-        
-        const { error: insertError } = await supabase
-          .from('programadas')
-          .insert(tareaData)
-          .select();
-        error = insertError;
-        toast.success('Tarea programada creada');
-      }
-
-      if (error) throw error;
-
-      onTareaGuardada();
-      handleClose();
-    } catch (error) {
-      console.error('Error al guardar tarea:', error);
-      toast.error(error.message || 'Error al guardar tarea programada');
-    }
-  };
+    onTareaGuardada();
+    handleClose();
+  } catch (error) {
+    console.error('Error al guardar tarea:', error);
+    toast.error(error.message || 'Error al guardar tarea programada');
+  }
+};
 
   const eliminarTarea = async () => {
     if (!window.confirm('¿Estás seguro de eliminar esta tarea programada?')) return;

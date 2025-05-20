@@ -12,7 +12,7 @@ import ModalTareas from '../components/ModalTareas';
 import Pedidos from '../components/Pedidos';
 import ModalTareasProgramadas from '../components/ModalTareasProgramadas';
 import TarjetaProgramada from "../components/TarjetaProgramada";
-
+import { toast } from 'react-toastify';
 dayjs.extend(duration);
 dayjs.extend(utc);
 dayjs.extend(timezone);
@@ -134,38 +134,51 @@ export default function Home({ usuario }) {
   }, []);
 
 const cargarProgramadas = async () => {
-  setLoading(true);
   try {
-let query = supabase
+    const { data: { user }, error: authError } = await supabase.auth.getUser();
+    if (authError || !user) throw new Error('No autenticado');
 
-  .from('registro_programadas')
-  .select(`
-    *,
-    programadas: id_prog (*) 
-  `)
-  .eq('estado', 'pendiente');
+    const inicioDia = dayjs().startOf('day').toISOString();
+    const finDia = dayjs().endOf('day').toISOString();
 
-    if (filtroProgUsuario) {
-      query = query.contains('usuarios_asignados', [filtroProgUsuario]);
-    }
+    const { data, error } = await supabase
+      .from('registro_programadas')
+      .select(`
+        *,
+        programadas (
+          id,
+          descripcion,
+          creado_por,
+          usuarios_asignados,
+          tipo_recurrencia,
+          fecha_vencimiento,
+          estado
+        )
+      `)
 
-    if (filtroProgEstado) {
-      query = query.eq('estado', filtroProgEstado);
-    }
-
-    const { data, error } = await query;
+      .eq('programadas.activa', true);
 
     if (error) throw error;
 
-    setTareasProgramadas(data || []);
-    setError(null);
-  } catch (err) {
-    console.error("Error cargando tareas programadas:", err);
-    setError("Error al cargar tareas programadas");
-  } finally {
-    setLoading(false);
+    // Filtramos posibles nulls por si alguna relación no se une bien
+    const tareasFiltradas = data.filter(item => item.programadas !== null);
+
+    // Podés mapear o transformar aquí si querés adaptar el formato
+    setTareasProgramadas(
+      tareasFiltradas.map(r => ({
+        ...r.programadas,
+        id_prog: r.id,
+        fecha_vencimiento: r.fecha_vencimiento,
+        estado: r.estado,
+      }))
+    );
+
+  } catch (error) {
+    console.error('Error al cargar tareas programadas:', error);
+    toast.error('Error al cargar tareas programadas');
   }
 };
+
 
 const calcularProximaFecha = (tarea) => {
   if (!tarea?.fecha_vencimiento) return null;
@@ -754,12 +767,12 @@ const calcularProximaFecha = (tarea) => {
                   </div>
                 ) : (
                   <div className="d-flex flex-column gap-2" ref={tareasContainerRef}>
-                    {tareasFiltradas.map(tarea => (
-<TarjetaProgramada
-  key={tarea.id}
-  tarea={tarea}
-  selected={tareaSeleccionada?.id === tarea.id}
-  onSelect={(id) => setTareaSeleccionada(tareasProgramadas.find(t => t.id === id))}
+                   {tareasProgramadas.map(tarea => (
+  <TarjetaProgramada
+    key={tarea.id}
+    tarea={tarea}
+    selected={tareaSeleccionada?.id === tarea.id}
+    onSelect={(id) => setTareaSeleccionada(tareasProgramadas.find(t => t.id === id))}
   onComplete={async (id, nuevoEstado) => {
     const tarea = tareasProgramadas.find(t => t.id === id);
     
@@ -770,8 +783,8 @@ const calcularProximaFecha = (tarea) => {
     
     try {
       // 2. Registrar en historial
-      await supabase.from('historial_tareas').insert({
-        tarea_id: id,
+      await supabase.from('registro_programadas').insert({
+        tarea_id: id_prog,
         fecha_programada: tarea.fecha_vencimiento,
         fecha_ejecucion: new Date().toISOString(),
         estado: nuevoEstado,
@@ -787,8 +800,8 @@ const calcularProximaFecha = (tarea) => {
             .from('programadas')
             .update({
               fecha_vencimiento: proximaFecha,
-              estado: 'pendiente',
-              ultima_ejecucion: new Date().toISOString()
+              estado: 'Pendiente',
+              proxima_ejecucion: new Date().toISOString()
             })
             .eq('id', id);
         }
