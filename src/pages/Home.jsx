@@ -43,11 +43,12 @@ export default function Home({ usuario }) {
   const [showProgramadasModal, setShowProgramadasModal] = useState(false);
   const [filtroProgEstado, setFiltroProgEstado] = useState(null);
   const [filtroProgUsuario, setFiltroProgUsuario] = useState(null);
-  const modalTareasProgramadasRef = useRef();
-  const [localRefresh, setLocalRefresh] = useState(0);
   const [mostrarSoloPendientes, setMostrarSoloPendientes] = useState(false);
-
+  const [localRefresh, setLocalRefresh] = useState(0);
   const tareasRef = useRef(null);
+  const accionesRef = useRef(null);
+  const tareasContainerRef = useRef(null);
+  const modalTareasProgramadasRef = useRef();
   // Efecto para manejar clicks fuera
   useEffect(() => {
     const handleClickOutside = (event) => {
@@ -61,10 +62,6 @@ export default function Home({ usuario }) {
       document.removeEventListener('mousedown', handleClickOutside);
     };
   }, []);
-
-  // 1. Agrega estas referencias al inicio de tu componente
-  const accionesRef = useRef(null);
-  const tareasContainerRef = useRef(null);
 
   // 2. Agrega este efecto para manejar la deselección
   useEffect(() => {
@@ -83,18 +80,16 @@ export default function Home({ usuario }) {
     };
   }, [tareaSeleccionada]);
 
-  // Filtrar y ordenar tareas
-  const tareasFiltradas = useMemo(() => {
-    return tareasProgramadas
-      .filter(t => !mostrarSoloPendientes || t.estado !== 'Realizada')
-      .sort((a, b) => {
-        // Ordenar por prioridad (vencidas primero, luego por fecha más cercana)
-        const fechaA = dayjs(a.fecha + (a.hora ? `T${a.hora}` : ''));
-        const fechaB = dayjs(b.fecha + (b.hora ? `T${b.hora}` : ''));
-        return fechaA.diff(fechaB);
-      });
-  }, [tareasProgramadas, mostrarSoloPendientes]);
-
+// Cambia el useMemo para filtrar tareas pendientes
+const tareasFiltradas = useMemo(() => {
+  return tareasProgramadas
+    .filter(t => !mostrarSoloPendientes || t.estado.toLowerCase() === 'pendiente')
+    .sort((a, b) => {
+      const fechaA = dayjs(a.fecha_vencimiento || a.fecha + (a.hora ? `T${a.hora}` : ''));
+      const fechaB = dayjs(b.fecha_vencimiento || b.fecha + (b.hora ? `T${b.hora}` : ''));
+      return fechaA.diff(fechaB);
+    });
+}, [tareasProgramadas, mostrarSoloPendientes]);
 
   useEffect(() => {
     inicializar();
@@ -113,6 +108,33 @@ export default function Home({ usuario }) {
       supabase.removeChannel(subscriptionProgramadas);
     };
   }, []);
+
+    // Manejador de clic fuera
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (
+        containerRef.current &&
+        !containerRef.current.contains(event.target) &&
+        pedidoSeleccionado
+      ) {
+        // Verificar si el clic no fue en un modal abierto
+        const isModalOpen = showPedidosModal || showTareasModal || showProgramadasModal;
+        const isNavbarClick = event.target.closest('.navbar') ||
+          event.target.closest('.offcanvas');
+
+        if (!isModalOpen && !isNavbarClick) {
+          setPedidoSeleccionado(null);
+          setTareaSeleccionada(null);
+        }
+      }
+    };
+
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, [pedidoSeleccionado, showPedidosModal, showTareasModal, showProgramadasModal]);
+
 
   const inicializar = async () => {
     actualizarHoraYSaludo();
@@ -136,51 +158,52 @@ export default function Home({ usuario }) {
 
 const cargarProgramadas = async () => {
   try {
+    const hoyInicio = dayjs().startOf('day').toISOString();
+    const hoyFin = dayjs().endOf('day').toISOString();
     const { data: { user }, error: authError } = await supabase.auth.getUser();
     if (authError || !user) throw new Error('No autenticado');
-
-    const inicioDia = dayjs().startOf('day').toISOString();
-    const finDia = dayjs().endOf('day').toISOString();
+    // Obtener rango del día actual
 
     const { data, error } = await supabase
       .from('registro_programadas')
       .select(`
-        *,
+        id,                   
+        estado,
+        fecha_vencimiento,
+        demora,
+        id_prog,              
         programadas (
           id,
           descripcion,
           creado_por,
           usuarios_asignados,
           tipo_recurrencia,
-          fecha_vencimiento,
-          estado
+          activa
         )
       `)
-
-      .eq('programadas.activa', true);
+      .eq('programadas.activa', true)
+      .gte('fecha_vencimiento', hoyInicio)
+      .lte('fecha_vencimiento', hoyFin)
+      .order('fecha_vencimiento', { ascending: true });
 
     if (error) throw error;
 
-    // Filtramos posibles nulls por si alguna relación no se une bien
-    const tareasFiltradas = data.filter(item => item.programadas !== null);
+    // Filtramos y mapeamos manteniendo el ID del registro
+    const tareasFiltradas = data
+      .filter(item => item.programadas !== null)
+      .map(r => ({
+        ...r,  // Conserva todos los campos del registro
+        ...r.programadas,  // Combina con los datos de programadas
+        registro_id: r.id,  // ID único para usar como key
+      }));
 
-    // Podés mapear o transformar aquí si querés adaptar el formato
-    setTareasProgramadas(
-      tareasFiltradas.map(r => ({
-        ...r.programadas,
-        id_prog: r.id,
-        fecha_vencimiento: r.fecha_vencimiento,
-        estado: r.estado,
-      }))
-    );
+    setTareasProgramadas(tareasFiltradas);
 
   } catch (error) {
     console.error('Error al cargar tareas programadas:', error);
     toast.error('Error al cargar tareas programadas');
   }
 };
-
-
 const calcularProximaFecha = (tarea) => {
   if (!tarea?.fecha_vencimiento) return null;
 
@@ -268,33 +291,40 @@ const calcularProximaFecha = (tarea) => {
     }
   };
 
-  const cargarTareasPendientes = async () => {
-    setLoading(true);
-    try {
-      const { data, error } = await supabase
-        .from('registro_programadas')
-        .select(`
-          *,
-          programada: id_programada (
-            *,
-            historial: registro_programadas (
-              *,
-              usuario: create_for (*)
-            )
-          )
-        `)
-        .eq('estado', 'pendiente')
-        .order('fecha_ejecucion', { ascending: true });
+const cargarTareasPendientes = async () => {
+  setLoading(true);
+  try {
+    // Obtener rango del día actual
+    const hoyInicio = dayjs().startOf('day').toISOString();
+    const hoyFin = dayjs().endOf('day').toISOString();
 
-      if (error) throw error;
-      setTareasProgramadas(data || []);
-    } catch (err) {
-      console.error("Error cargando tareas:", err);
-      setError("Error al cargar tareas");
-    } finally {
-      setLoading(false);
-    }
-  };
+    const { data, error } = await supabase
+      .from('registro_programadas')
+      .select(`
+        *,
+        programada: id_programada (
+          *,
+          historial: registro_programadas (
+            *,
+            usuario: create_for (*)
+          )
+        )
+      `)
+      .eq('estado', 'pendiente')
+      .gte('fecha_vencimiento', hoyInicio)
+      .lte('fecha_vencimiento', hoyFin)
+      .order('fecha_ejecucion', { ascending: true });
+
+    if (error) throw error;
+    setTareasProgramadas(data || []);
+  } catch (err) {
+    console.error("Error cargando tareas:", err);
+    setError("Error al cargar tareas");
+  } finally {
+    setLoading(false);
+  }
+};
+
 
   const completarTarea = async (idRegistro, estado) => {
   try {
@@ -341,7 +371,6 @@ const calcularProximaFecha = (tarea) => {
       console.error('Error cambiando estado:', error);
     }
   };
-
 
   const handleLogout = () => {
     localStorage.removeItem("usuario");
@@ -404,31 +433,6 @@ const calcularProximaFecha = (tarea) => {
     setShowTareasModal(true);
   };
 
-  // Manejador de clic fuera
-  useEffect(() => {
-    const handleClickOutside = (event) => {
-      if (
-        containerRef.current &&
-        !containerRef.current.contains(event.target) &&
-        pedidoSeleccionado
-      ) {
-        // Verificar si el clic no fue en un modal abierto
-        const isModalOpen = showPedidosModal || showTareasModal || showProgramadasModal;
-        const isNavbarClick = event.target.closest('.navbar') ||
-          event.target.closest('.offcanvas');
-
-        if (!isModalOpen && !isNavbarClick) {
-          setPedidoSeleccionado(null);
-          setTareaSeleccionada(null);
-        }
-      }
-    };
-
-    document.addEventListener('mousedown', handleClickOutside);
-    return () => {
-      document.removeEventListener('mousedown', handleClickOutside);
-    };
-  }, [pedidoSeleccionado, showPedidosModal, showTareasModal, showProgramadasModal]);
 
   const abrirModalEdicion = (pedido) => {
     setPedidoEditando(pedido);
@@ -444,8 +448,6 @@ const calcularProximaFecha = (tarea) => {
     setShowPedidosModal(false);
     setPedidoEditando(null);
   };
-
-
 
   return (
     <div style={{ minHeight: "100vh", width: "100%", backgroundColor: "#2d3748", color: "white" }}>
@@ -696,28 +698,32 @@ const calcularProximaFecha = (tarea) => {
                 </>
               ) : (
                 <>
-                  <div className="form-check form-switch" style={{ marginRight: '52%' }}>
-                    <input
-                      className="form-check-input"
-                      type="checkbox"
-                      id="filtroPendientes"
-                      checked={mostrarSoloPendientes}
-                      onChange={() => setMostrarSoloPendientes(!mostrarSoloPendientes)}
-                      style={{
-                        backgroundColor: mostrarSoloPendientes ?  '#a0aec0':'#4a5568' ,
-                        borderColor: mostrarSoloPendientes ?  '#a0aec0':'#4a5568' ,
-                      }}
-                    />
-                    <label
-                      className="form-check-label"
-                      htmlFor="filtroPendientes"
-                      style={{
-                        color: '#a0aec0',
-                        fontSize: '0.9rem',
-                        fontWeight: '600',
-                      }}
-                       
-                    >
+
+<div className="form-check form-switch" style={{ marginRight: '52%' }}>
+  <input
+    className="form-check-input"
+    type="checkbox"
+    id="filtroPendientes"
+    checked={mostrarSoloPendientes}
+    onChange={() => {
+      setMostrarSoloPendientes(!mostrarSoloPendientes);
+      setTareaSeleccionada(null); // Limpiar selección al cambiar filtro
+    }}
+    style={{
+      backgroundColor: mostrarSoloPendientes ? '#a0aec0' : '#4a5568',
+      borderColor: mostrarSoloPendientes ? '#a0aec0' : '#4a5568',
+    }}
+  />
+  <label
+    className="form-check-label"
+    htmlFor="filtroPendientes"
+    style={{
+      color: '#a0aec0',
+      fontSize: '0.9rem',
+      fontWeight: '600',
+    }}
+  >
+
                       Pendientes
                     </label>
                   </div>
@@ -767,23 +773,43 @@ const calcularProximaFecha = (tarea) => {
                     <p>Sin tareas {mostrarSoloPendientes ? 'pendientes' : 'programadas'}</p>
                   </div>
                 ) : (
-                  <div className="d-flex flex-column gap-2" ref={tareasContainerRef}>
-                  {tareasProgramadas.map(tarea => (
-                  <TarjetaProgramada
-                    key={tarea.id}
-                    tarea={tarea} 
-                    selected={tareaSeleccionada?.id === tarea.id}
-                    onSelect={(id) => setTareaSeleccionada(tareasProgramadas.find(t => t.id === id))}
-                    onComplete={async (id, nuevoEstado) => {
-                      // Solo actualización optimista, el trigger manejará el resto
-                      setTareasProgramadas(prev => prev.map(t => 
-                        t.id === id ? { ...t, estado: nuevoEstado } : t
-                      ));
-                      await cargarProgramadas(); // Recargar datos después de la actualización
-                    }}
-                  />
-                ))}
-                </div>
+                    <div className="d-flex flex-column gap-2" ref={tareasContainerRef}>
+              {tareasFiltradas.map(tarea => (
+                <TarjetaProgramada
+                  key={tarea.registro_id}
+                  tarea={tarea}
+                  selected={tareaSeleccionada?.registro_id === tarea.registro_id}
+                  onSelect={(registro_id) =>
+                    setTareaSeleccionada(tareasFiltradas.find(t => t.registro_id === registro_id))
+                  }
+                  onComplete={async (registro_id, nuevoEstado) => {
+                    // 1. Actualización optimista inmediata
+                    setTareasProgramadas(prev =>
+                      prev.map(t =>
+                        t.registro_id === registro_id ? { ...t, estado: nuevoEstado } : t
+                      )
+                    );
+
+                    try {
+                      // 2. Persistencia en la base de datos
+                      const { error } = await supabase
+                        .from('registro_programadas')
+                        .update({ estado: nuevoEstado })
+                        .eq('id', registro_id);
+
+                      if (error) throw error;
+
+                      // 3. Refrescá en segundo plano si querés garantizar consistencia
+                      cargarProgramadas(); // SIN setTimeout
+                    } catch (error) {
+                      console.error("Error actualizando estado:", error);
+                      // (Opcional) Mostrar alerta al usuario o revertir cambios si hace falta
+                    }
+                  }}
+                />
+              ))}
+
+              </div>
                 )}
               </>
             )}

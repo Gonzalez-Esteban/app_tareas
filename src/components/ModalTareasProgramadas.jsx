@@ -41,7 +41,7 @@ const ModalTareasProgramadas = forwardRef(({
         setDescripcion('');
         setUsuariosSeleccionados([]);
         setTipoRecurrencia('diaria');
-        setDiasRecurrencia(1);
+        setDiasRecurrencia(0);
         setHoraEjecucion('09:00');
         setFechaVencimiento(dayjs().add(1, 'day').format('YYYY-MM-DD'));
       }
@@ -162,7 +162,7 @@ const guardarTareaProgramada = async () => {
       tipo_recurrencia: tipoRecurrencia,
       proxima_ejecucion: proximaEjecucion,
       dias_recurrencia: tipoRecurrencia === 'diaria' ? diasRecurrencia : null,
-      estado: 'Pendiente',
+      //estado: 'Pendiente',
       activa: true
     };
 
@@ -193,7 +193,6 @@ const guardarTareaProgramada = async () => {
     toast.error(error.message || 'Error al guardar tarea programada');
   }
 };
-
   const eliminarTarea = async () => {
     if (!window.confirm('¿Estás seguro de eliminar esta tarea programada?')) return;
 

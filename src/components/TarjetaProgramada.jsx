@@ -23,6 +23,10 @@ const TarjetaProgramada = ({
   const [cancelLoading, setCancelLoading] = useState(false);
   const [demora, setDemora] = useState(null);
 
+
+useEffect(() => {
+  setEstado(tarea.estado || 'Pendiente');
+}, [tarea.estado]);
   // Obtener información del creador y usuarios asignados
   useEffect(() => {
     const obtenerUsuarios = async () => {
@@ -108,83 +112,87 @@ const TarjetaProgramada = ({
     };
   };
 
-const marcarComoRealizada = async (e) => {
-  e.stopPropagation();
-  setLoading(true);
+  const marcarComoRealizada = async (e) => {
+    e.stopPropagation();
+    setLoading(true);
 
-  try {
-    // 1. Obtener usuario actual
-    const { data: { user }, error: userError } = await supabase.auth.getUser();
-    if (userError || !user) throw new Error('No se pudo obtener el usuario');
+    try {
+      // 1. Obtener usuario actual
+      const { data: { user }, error: userError } = await supabase.auth.getUser();
+      if (userError || !user) throw new Error('No se pudo obtener el usuario');
 
-    // 2. Calcular demora
-    const { minutos, formateada } = calcularDemora();
+      // 2. Calcular demora
+      const { minutos, formateada } = calcularDemora();
 
-    // 3. Calcular próxima fecha de ejecución si es recurrente
-    if (tarea.tipo_recurrencia && tarea.tipo_recurrencia !== 'única' && tarea.activa) {
-      const proximaFecha = calcularProximaFecha(tarea);
-      
-      // Actualizar programadas con la próxima ejecución
-      await supabase
-        .from('programadas')
+      // 3. Calcular próxima fecha de ejecución si es recurrente
+      if (tarea.tipo_recurrencia && tarea.tipo_recurrencia !== 'única' && tarea.activa) {
+        const proximaFecha = calcularProximaFecha(tarea);
+        
+        // Actualizar programadas con la próxima ejecución
+        await supabase
+          .from('programadas')
+          .update({
+            proxima_ejecucion: proximaFecha
+          })
+          .eq('id', tarea.id_prog);
+      }
+
+      // 4. Actualizar registro en registro_programadas
+      const { error: updateError } = await supabase
+        .from('registro_programadas')
         .update({
-          proxima_ejecucion: proximaFecha
+          estado: 'Realizada',
+          fecha_finalizado: new Date().toISOString(),
+          finalizo: user.id,
+          demora: minutos.toString()
         })
-        .eq('id', tarea.id_prog);
+        .eq('id_prog', tarea.id);
+
+      if (updateError) throw updateError;
+
+      // 5. Actualización optimista mínima (opcional)
+      onComplete(tarea.id, 'Realizada'); // Solo para notificar al componente padre
+
+    } catch (error) {
+      console.error('Error al completar tarea:', error);
+      alert(`Error: ${error.message}`);
+    } finally {
+      setLoading(false);
     }
+  };
 
-    // 4. Actualizar registro en registro_programadas
-    const { error: updateError } = await supabase
-      .from('registro_programadas')
-      .update({
-        estado: 'Realizada',
-        fecha_finalizado: new Date().toISOString(),
-        finalizo: user.id,
-        demora: minutos.toString()
-      })
-      .eq('id_prog', tarea.id);
+  const calcularProximaFecha = (tarea) => {
+    const fechaActual = dayjs(tarea.fecha_vencimiento);
+    
+    switch(tarea.tipo_recurrencia) {
+      case 'diaria':
+        return fechaActual.add(1, 'day').toISOString();
+      case 'semanal':
+        return fechaActual.add(1, 'week').toISOString();
+      case 'mensual':
+        return fechaActual.add(1, 'month').toISOString();
+      default:
+        return null;
+    }
+  };
 
-    if (updateError) throw updateError;
-
-    // 5. Actualización optimista mínima (opcional)
-    onComplete(tarea.id, 'Realizada'); // Solo para notificar al componente padre
-
-  } catch (error) {
-    console.error('Error al completar tarea:', error);
-    alert(`Error: ${error.message}`);
-  } finally {
-    setLoading(false);
-  }
-};
-
-const calcularProximaFecha = (tarea) => {
-  const fechaActual = dayjs(tarea.fecha_vencimiento);
-  
-  switch(tarea.tipo_recurrencia) {
-    case 'diaria':
-      return fechaActual.add(1, 'day').toISOString();
-    case 'semanal':
-      return fechaActual.add(1, 'week').toISOString();
-    case 'mensual':
-      return fechaActual.add(1, 'month').toISOString();
-    default:
-      return null;
-  }
-};
 const cancelarTarea = async (e) => {
   e.stopPropagation();
   setCancelLoading(true);
 
   try {
-    // 1. Obtener usuario actual
+    // 1. Actualización optimista (cambia el estado inmediatamente)
+    onComplete(tarea.registro_id, 'Cancelada'); // Notifica al componente padre
+
+    // 2. Obtener usuario actual
     const { data: { user }, error: userError } = await supabase.auth.getUser();
     if (userError || !user) throw new Error('No se pudo obtener el usuario');
 
-    // 2. Calcular demora
-    const { minutos, formateada } = calcularDemora();
+    // 3. Calcular demora
+    const { minutos } = calcularDemora();
 
-    // 3. Actualizar registro
-    const { error: updateError } = await supabase
+    // 4. Actualizar registro principal
+    const updatePromise = supabase
       .from('registro_programadas')
       .update({
         estado: 'Cancelada',
@@ -192,14 +200,15 @@ const cancelarTarea = async (e) => {
         finalizo: user.id,
         demora: minutos.toString()
       })
-      .eq('id', tarea.id_prog);
+      .eq('id', tarea.registro_id); // Cambiado a registro_id que es el ID directo
 
-    if (updateError) throw updateError;
-
-
+    // 5. Ejecutar operación y refrescar en segundo plano
+    await updatePromise;
   } catch (error) {
     console.error('Error al cancelar tarea:', error);
-    alert(`Error: ${error.message}`);
+    // Revertir la actualización optimista en caso de error
+    onComplete(tarea.registro_id, tarea.estado);
+    toast.error(`Error al cancelar tarea: ${error.message}`);
   } finally {
     setCancelLoading(false);
   }
@@ -214,36 +223,36 @@ const cancelarTarea = async (e) => {
     }
   };
 
-const getFechaProgramada = () => {
-  if (!tarea.fecha_vencimiento) return '';
-  
-  // Crear objeto dayjs a partir del timestamp completo
-  const fechaHora = dayjs(tarea.fecha_vencimiento);
-  
-  // Extraer y formatear componentes
-  const fecha = fechaHora.format('DD/MM/YYYY');
+  const getFechaProgramada = () => {
+    if (!tarea.fecha_vencimiento) return '';
+    
+    // Crear objeto dayjs a partir del timestamp completo
+    const fechaHora = dayjs(tarea.fecha_vencimiento);
+    
+    // Extraer y formatear componentes
+    const fecha = fechaHora.format('DD/MM/YYYY');
 
-  
-  return `${fecha}`;
-};
+    
+    return `${fecha}`;
+  };
 
-const getHoraProgramada = () => {
-  if (!tarea.fecha_vencimiento) return '';
-  
-  // Crear objeto dayjs a partir del timestamp completo
-  const fechaHora = dayjs(tarea.fecha_vencimiento);
+  const getHoraProgramada = () => {
+    if (!tarea.fecha_vencimiento) return '';
+    
+    // Crear objeto dayjs a partir del timestamp completo
+    const fechaHora = dayjs(tarea.fecha_vencimiento);
 
-  const hora = fechaHora.format('HH:mm');
-  
-  return `${hora}`;
-};
+    const hora = fechaHora.format('HH:mm');
+    
+    return `${hora}`;
+  };
 
 return (
     <div
       className={`card mb-2 border-${selected ? 'light' : 'secondary'}`}
       onClick={(e) => {
         if (e.target.tagName !== 'BUTTON' && !e.target.closest('button')) {
-          onSelect(tarea.id);
+          onSelect(tarea.registro_id);
         }
       }}
       style={{
