@@ -13,7 +13,7 @@ const TarjetaProgramada = ({
   tarea,
   selected = false,
   onSelect = () => {},
-  onComplete = (id, estado) => {}, // <- Añade el parámetro estado
+  onComplete = (id, estado) => {},
 }) => {
   const [creador, setCreador] = useState('');
   const [asignados, setAsignados] = useState([]);
@@ -113,61 +113,97 @@ const marcarComoRealizada = async (e) => {
   setLoading(true);
 
   try {
+    // 1. Obtener usuario actual
+    const { data: { user }, error: userError } = await supabase.auth.getUser();
+    if (userError || !user) throw new Error('No se pudo obtener el usuario');
+
+    // 2. Calcular demora
     const { minutos, formateada } = calcularDemora();
 
-    const { data, error } = await supabase
-      .from('programadas')
+    // 3. Calcular próxima fecha de ejecución si es recurrente
+    if (tarea.tipo_recurrencia && tarea.tipo_recurrencia !== 'única' && tarea.activa) {
+      const proximaFecha = calcularProximaFecha(tarea);
+      
+      // Actualizar programadas con la próxima ejecución
+      await supabase
+        .from('programadas')
+        .update({
+          proxima_ejecucion: proximaFecha
+        })
+        .eq('id', tarea.id_prog);
+    }
+
+    // 4. Actualizar registro en registro_programadas
+    const { error: updateError } = await supabase
+      .from('registro_programadas')
       .update({
         estado: 'Realizada',
         fecha_finalizado: new Date().toISOString(),
-        demora: minutos
+        finalizo: user.id,
+        demora: minutos.toString()
       })
-      .eq('id', tarea.id);
+      .eq('id_prog', tarea.id);
 
-    if (error) throw error;
+    if (updateError) throw updateError;
 
-    setEstado('Realizada');
-    setTiempoRestante('Completada');
-    setDemora(formateada);
-    onComplete(tarea.id, 'Realizada');  // <- Pasa el estado como parámetro
+    // 5. Actualización optimista mínima (opcional)
+    onComplete(tarea.id, 'Realizada'); // Solo para notificar al componente padre
+
   } catch (error) {
-    console.error('Error al marcar como realizada:', error);
-    alert('Error al marcar como realizada');
+    console.error('Error al completar tarea:', error);
+    alert(`Error: ${error.message}`);
   } finally {
     setLoading(false);
   }
 };
 
+const calcularProximaFecha = (tarea) => {
+  const fechaActual = dayjs(tarea.fecha_vencimiento);
+  
+  switch(tarea.tipo_recurrencia) {
+    case 'diaria':
+      return fechaActual.add(1, 'day').toISOString();
+    case 'semanal':
+      return fechaActual.add(1, 'week').toISOString();
+    case 'mensual':
+      return fechaActual.add(1, 'month').toISOString();
+    default:
+      return null;
+  }
+};
 const cancelarTarea = async (e) => {
   e.stopPropagation();
   setCancelLoading(true);
 
   try {
+    // 1. Obtener usuario actual
+    const { data: { user }, error: userError } = await supabase.auth.getUser();
+    if (userError || !user) throw new Error('No se pudo obtener el usuario');
+
+    // 2. Calcular demora
     const { minutos, formateada } = calcularDemora();
 
-    const { data, error } = await supabase
-      .from('programadas')
+    // 3. Actualizar registro
+    const { error: updateError } = await supabase
+      .from('registro_programadas')
       .update({
         estado: 'Cancelada',
         fecha_finalizado: new Date().toISOString(),
-        demora: minutos
+        finalizo: user.id,
+        demora: minutos.toString()
       })
-      .eq('id', tarea.id);
+      .eq('id', tarea.id_prog);
 
-    if (error) throw error;
+    if (updateError) throw updateError;
 
-    setEstado('Cancelada');
-    setTiempoRestante('Cancelada');
-    setDemora(formateada);
-    onComplete(tarea.id, 'Cancelada');  // <- Pasa el estado como parámetro
+
   } catch (error) {
     console.error('Error al cancelar tarea:', error);
-    alert('Error al cancelar tarea');
+    alert(`Error: ${error.message}`);
   } finally {
     setCancelLoading(false);
   }
 };
-
   const getEstadoStyles = () => {
     switch (estado) {
       case 'Realizada': return 'bg-success';
@@ -178,12 +214,31 @@ const cancelarTarea = async (e) => {
     }
   };
 
-  const getFechaFormateada = () => {
-    if (!tarea.created_at) return '';
-    return (tarea.hora_ejecucion ? tarea.hora_ejecucion: '');
-  };
+const getFechaProgramada = () => {
+  if (!tarea.fecha_vencimiento) return '';
+  
+  // Crear objeto dayjs a partir del timestamp completo
+  const fechaHora = dayjs(tarea.fecha_vencimiento);
+  
+  // Extraer y formatear componentes
+  const fecha = fechaHora.format('DD/MM/YYYY');
 
-  return (
+  
+  return `${fecha}`;
+};
+
+const getHoraProgramada = () => {
+  if (!tarea.fecha_vencimiento) return '';
+  
+  // Crear objeto dayjs a partir del timestamp completo
+  const fechaHora = dayjs(tarea.fecha_vencimiento);
+
+  const hora = fechaHora.format('HH:mm');
+  
+  return `${hora}`;
+};
+
+return (
     <div
       className={`card mb-2 border-${selected ? 'light' : 'secondary'}`}
       onClick={(e) => {
@@ -200,20 +255,16 @@ const cancelarTarea = async (e) => {
     >
       <div className="card-body p-3">
         <div className="d-flex justify-content-between align-items-start mb-2">        
-          
-          <div className="d-flex flex-sm-row align-items-start" style={{ minWidth: '15px' }}>
-          <i className="bi bi-calendar-event me-1 text-white"></i>
-          <small className="text-white" style={{ fontSize: '0.8rem', color: '#a0aec0', fontWeight: 700, marginTop:'2px' }}>
-              {getFechaFormateada()}
-          </small>
+          <div className="d-flex align-items-center">
+            <i className="bi bi-calendar-event me-2 text-white"></i>
+            <small className="text-white" style={{ fontSize: '0.8rem' }}>
+              {getHoraProgramada()}
+            </small>
           </div>
-          
-          <h6 className="card-title mb-0 text-white " style={{ fontSize: '1rem', flex: 1, margin: '0 8px', marginTop:'12 px' }}>
+          <h6 className="card-title mb-0 text-white" style={{ fontSize: '1rem', flex: 1, margin: '0 8px' }}>
             {tarea.descripcion}
           </h6>
-          
-           
-          <div className="d-flex flex-column align-items-start" style={{ minWidth: '80px' }}>
+          <div className="d-flex flex-column align-items-center" style={{ minWidth: '80px' }}>
             <span className={`badge ${getEstadoStyles()} mb-1`}>
               {estado} 
             </span>
@@ -252,7 +303,6 @@ const cancelarTarea = async (e) => {
               <small className="text-white">
                 Generó: {creador || 'usuario'}
               </small>
-
             </div>
             <div className="d-flex">
               {estado !== 'Realizada' && estado !== 'Cancelada' && (

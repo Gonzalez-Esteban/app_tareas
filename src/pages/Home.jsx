@@ -125,6 +125,7 @@ export default function Home({ usuario }) {
     setLocalRefresh(prev => prev + 1);
   }, [timeRefresh]);
 
+  
   useEffect(() => {
     const interval = setInterval(() => {
       setTimeRefresh(Date.now());
@@ -767,60 +768,22 @@ const calcularProximaFecha = (tarea) => {
                   </div>
                 ) : (
                   <div className="d-flex flex-column gap-2" ref={tareasContainerRef}>
-                   {tareasProgramadas.map(tarea => (
-  <TarjetaProgramada
-    key={tarea.id}
-    tarea={tarea}
-    selected={tareaSeleccionada?.id === tarea.id}
-    onSelect={(id) => setTareaSeleccionada(tareasProgramadas.find(t => t.id === id))}
-  onComplete={async (id, nuevoEstado) => {
-    const tarea = tareasProgramadas.find(t => t.id === id);
-    
-    // 1. Actualización optimista
-    setTareasProgramadas(prev => prev.map(t => 
-      t.id === id ? { ...t, estado: nuevoEstado } : t
-    ));
-    
-    try {
-      // 2. Registrar en historial
-      await supabase.from('registro_programadas').insert({
-        tarea_id: id_prog,
-        fecha_programada: tarea.fecha_vencimiento,
-        fecha_ejecucion: new Date().toISOString(),
-        estado: nuevoEstado,
-        usuario_id: usuario.id_uuid
-      });
-
-      // 3. Si es recurrente, actualizar próxima fecha
-      if (nuevoEstado === 'completada' && tarea.tipo_recurrencia && tarea.tipo_recurrencia !== 'única') {
-        const proximaFecha = calcularProximaFecha(tarea);
-        
-        if (proximaFecha) {
-          await supabase
-            .from('programadas')
-            .update({
-              fecha_vencimiento: proximaFecha,
-              estado: 'Pendiente',
-              proxima_ejecucion: new Date().toISOString()
-            })
-            .eq('id', id);
-        }
-      }
-
-      // 4. Recargar datos
-      await cargarProgramadas();
-      
-    } catch (error) {
-      console.error("Error al actualizar tarea:", error);
-      // Revertir en caso de error
-      setTareasProgramadas(prev => prev.map(t => 
-        t.id === id ? { ...t, estado: tarea.estado } : t
-      ));
-    }
-  }}
-/>
-                    ))}
-                  </div>
+                  {tareasProgramadas.map(tarea => (
+                  <TarjetaProgramada
+                    key={tarea.id}
+                    tarea={tarea} 
+                    selected={tareaSeleccionada?.id === tarea.id}
+                    onSelect={(id) => setTareaSeleccionada(tareasProgramadas.find(t => t.id === id))}
+                    onComplete={async (id, nuevoEstado) => {
+                      // Solo actualización optimista, el trigger manejará el resto
+                      setTareasProgramadas(prev => prev.map(t => 
+                        t.id === id ? { ...t, estado: nuevoEstado } : t
+                      ));
+                      await cargarProgramadas(); // Recargar datos después de la actualización
+                    }}
+                  />
+                ))}
+                </div>
                 )}
               </>
             )}
