@@ -15,10 +15,9 @@ const ModalTareasProgramadas = forwardRef(({
   const [busquedaUsuario, setBusquedaUsuario] = useState('');
   const [usuariosSeleccionados, setUsuariosSeleccionados] = useState([]);
   const [cargando, setCargando] = useState(true);
-  const [horaEjecucion, setHoraEjecucion] = useState('09:00');
-  const [fechaVencimiento, setFechaVencimiento] = useState(dayjs().add(1, 'day').format('YYYY-MM-DD'));
-  const [tipoRecurrencia, setTipoRecurrencia] = useState('diaria');
-  const [diasRecurrencia, setDiasRecurrencia] = useState(1);
+  const [horaEjecucion, setHoraEjecucion] = useState(new Date().toTimeString().slice(0, 5));
+  const [fechaVencimiento, setFechaVencimiento] = useState(dayjs().format('YYYY-MM-DD'));
+  const [tipoRecurrencia, setTipoRecurrencia] = useState('unica');
   const modalRef = useRef(null);
   const modalInstance = useRef(null);
   const [modalVisible, setModalVisible] = useState(false);
@@ -29,21 +28,21 @@ const ModalTareasProgramadas = forwardRef(({
         // Cargar datos de la tarea existente
         setDescripcion(tarea.descripcion);
         setUsuariosSeleccionados(tarea.usuarios_asignados || []);
-        setTipoRecurrencia(tarea.tipo_recurrencia || 'diaria');
-        setDiasRecurrencia(tarea.dias_recurrencia || 1);
+        setTipoRecurrencia(tarea.tipo_recurrencia || 'unica');
+      
         
         // Parsear fecha y hora
         const fechaHora = dayjs(tarea.fecha_vencimiento);
         setFechaVencimiento(fechaHora.format('YYYY-MM-DD'));
-        setHoraEjecucion(tarea.hora_ejecucion || '09:00');
+        setHoraEjecucion(tarea.hora_ejecucion || new Date().toTimeString().slice(0, 5));
       } else {
-        // Resetear para nueva tarea
+        // Resetear para nueva tarea usando valores actuales
         setDescripcion('');
         setUsuariosSeleccionados([]);
-        setTipoRecurrencia('diaria');
-        setDiasRecurrencia(0);
-        setHoraEjecucion('09:00');
-        setFechaVencimiento(dayjs().add(1, 'day').format('YYYY-MM-DD'));
+        setTipoRecurrencia('unica');
+        // Mantener los valores iniciales que ya tienen la hora y fecha actual
+        setHoraEjecucion(new Date().toTimeString().slice(0, 5));
+        setFechaVencimiento(dayjs().format('YYYY-MM-DD'));
       }
       
       setModalVisible(true);
@@ -134,65 +133,66 @@ const ModalTareasProgramadas = forwardRef(({
     }
   };
   
-const guardarTareaProgramada = async () => {
-  if (!descripcion.trim()) {
-    toast.error('La descripción no puede estar vacía');
-    return;
-  }
-
-  if (usuariosSeleccionados.length === 0) {
-    toast.error('Debes asignar al menos un usuario');
-    return;
-  }
-
-  try {
-    const { data: { user }, error: authError } = await supabase.auth.getUser();
-    if (authError || !user) throw new Error('No autenticado');
-
-    const fechaHoraCompleta = `${fechaVencimiento}T${horaEjecucion}:00`;
-    const proximaEjecucion = tipoRecurrencia === 'única'
-      ? fechaHoraCompleta
-      : calcularProximaFecha(fechaHoraCompleta);
-
-    const tareaData = {
-      descripcion,
-      usuarios_asignados: usuariosSeleccionados.map(u => u.id),
-      fecha_vencimiento: fechaHoraCompleta,
-      hora_ejecucion: horaEjecucion,
-      tipo_recurrencia: tipoRecurrencia,
-      proxima_ejecucion: proximaEjecucion,
-      dias_recurrencia: tipoRecurrencia === 'diaria' ? diasRecurrencia : null,
-      //estado: 'Pendiente',
-      activa: true
-    };
-
-    let error;
-    if (tareaExistente) {
-      const { error: updateError } = await supabase
-        .from('programadas')
-        .update(tareaData)
-        .eq('id', tareaExistente.id);
-      error = updateError;
-      toast.success('Tarea programada actualizada');
-    } else {
-      tareaData.creado_por = user.id;
-
-      const { error: insertError } = await supabase
-        .from('programadas')
-        .insert(tareaData); // No hace falta select() si no usas el ID
-      error = insertError;
-      toast.success('Tarea programada creada');
+  const guardarTareaProgramada = async () => {
+    if (!descripcion.trim()) {
+      toast.error('La descripción no puede estar vacía');
+      return;
     }
 
-    if (error) throw error;
+    if (usuariosSeleccionados.length === 0) {
+      toast.error('Debes asignar al menos un usuario');
+      return;
+    }
 
-    onTareaGuardada();
-    handleClose();
-  } catch (error) {
-    console.error('Error al guardar tarea:', error);
-    toast.error(error.message || 'Error al guardar tarea programada');
-  }
-};
+    try {
+      const { data: { user }, error: authError } = await supabase.auth.getUser();
+      if (authError || !user) throw new Error('No autenticado');
+
+      const fechaHoraCompleta = `${fechaVencimiento}T${horaEjecucion}:00`;
+      const proximaEjecucion = tipoRecurrencia === 'unica'
+        ? fechaHoraCompleta
+        : calcularProximaFecha(fechaHoraCompleta);
+
+      const tareaData = {
+        descripcion,
+        usuarios_asignados: usuariosSeleccionados.map(u => u.id),
+        fecha_vencimiento: fechaHoraCompleta,
+        hora_ejecucion: horaEjecucion,
+        tipo_recurrencia: tipoRecurrencia === 'unica' ? 'unica' : tipoRecurrencia,
+        proxima_ejecucion: proximaEjecucion,
+        //dias_recurrencia: tipoRecurrencia === 'diaria' ? diasRecurrencia : null,
+        //estado: 'Pendiente',
+        activa: true
+      };
+
+      let error;
+      if (tareaExistente) {
+        const { error: updateError } = await supabase
+          .from('programadas')
+          .update(tareaData)
+          .eq('id', tareaExistente.id);
+        error = updateError;
+        toast.success('Tarea programada actualizada');
+      } else {
+        tareaData.creado_por = user.id;
+
+        const { error: insertError } = await supabase
+          .from('programadas')
+          .insert(tareaData); // No hace falta select() si no usas el ID
+        error = insertError;
+        toast.success('Tarea programada creada');
+      }
+
+      if (error) throw error;
+
+      onTareaGuardada();
+      handleClose();
+    } catch (error) {
+      console.error('Error al guardar tarea:', error);
+      toast.error(error.message || 'Error al guardar tarea programada');
+    }
+  };
+
   const eliminarTarea = async () => {
     if (!window.confirm('¿Estás seguro de eliminar esta tarea programada?')) return;
 
@@ -325,32 +325,18 @@ const guardarTareaProgramada = async () => {
             </div>
 
             <div className="mb-3">
-              <label className="form-label">Tipo de recurrencia:</label>
+              <label className="form-label">Recurrencia:</label>
               <select
                 className="form-select bg-secondary text-white border-dark"
                 value={tipoRecurrencia}
                 onChange={(e) => setTipoRecurrencia(e.target.value)}
               >
-                <option value="única">Única (no se repite)</option>
+                <option value="unica">Única (no se repite)</option>
                 <option value="diaria">Diaria</option>
                 <option value="semanal">Semanal</option>
                 <option value="mensual">Mensual</option>
               </select>
             </div>
-
-            {tipoRecurrencia === 'diaria' && (
-              <div className="mb-3">
-                <label className="form-label">Cada cuántos días:</label>
-                <input
-                  type="number"
-                  className="form-control bg-secondary text-white border-dark"
-                  min="1"
-                  max="30"
-                  value={diasRecurrencia}
-                  onChange={(e) => setDiasRecurrencia(Number(e.target.value))}
-                />
-              </div>
-            )}
 
             <div className="d-grid gap-2 mt-4">
               <button

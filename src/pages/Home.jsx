@@ -340,6 +340,7 @@ const cargarTareasPendientes = async () => {
     console.error("Error completando tarea:", error);
   }
 };
+
   const borrarPedido = async (id) => {
     if (!window.confirm("¿Estás seguro de borrar este pedido?")) return;
 
@@ -699,30 +700,30 @@ const cargarTareasPendientes = async () => {
               ) : (
                 <>
 
-<div className="form-check form-switch" style={{ marginRight: '52%' }}>
-  <input
-    className="form-check-input"
-    type="checkbox"
-    id="filtroPendientes"
-    checked={mostrarSoloPendientes}
-    onChange={() => {
-      setMostrarSoloPendientes(!mostrarSoloPendientes);
-      setTareaSeleccionada(null); // Limpiar selección al cambiar filtro
-    }}
-    style={{
-      backgroundColor: mostrarSoloPendientes ? '#a0aec0' : '#4a5568',
-      borderColor: mostrarSoloPendientes ? '#a0aec0' : '#4a5568',
-    }}
-  />
-  <label
-    className="form-check-label"
-    htmlFor="filtroPendientes"
-    style={{
-      color: '#a0aec0',
-      fontSize: '0.9rem',
-      fontWeight: '600',
-    }}
-  >
+        <div className="form-check form-switch" style={{ marginRight: '52%' }}>
+          <input
+            className="form-check-input"
+            type="checkbox"
+            id="filtroPendientes"
+            checked={mostrarSoloPendientes}
+            onChange={() => {
+              setMostrarSoloPendientes(!mostrarSoloPendientes);
+              setTareaSeleccionada(null); // Limpiar selección al cambiar filtro
+            }}
+            style={{
+              backgroundColor: mostrarSoloPendientes ? '#a0aec0' : '#4a5568',
+              borderColor: mostrarSoloPendientes ? '#a0aec0' : '#4a5568',
+            }}
+          />
+          <label
+            className="form-check-label"
+            htmlFor="filtroPendientes"
+            style={{
+              color: '#a0aec0',
+              fontSize: '0.9rem',
+              fontWeight: '600',
+            }}
+          >
 
                       Pendientes
                     </label>

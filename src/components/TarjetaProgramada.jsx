@@ -24,9 +24,9 @@ const TarjetaProgramada = ({
   const [demora, setDemora] = useState(null);
 
 
-useEffect(() => {
-  setEstado(tarea.estado || 'Pendiente');
-}, [tarea.estado]);
+  useEffect(() => {
+    setEstado(tarea.estado || 'Pendiente');
+  }, [tarea.estado]);
   // Obtener información del creador y usuarios asignados
   useEffect(() => {
     const obtenerUsuarios = async () => {
@@ -55,112 +55,154 @@ useEffect(() => {
     obtenerUsuarios();
   }, [tarea.creado_por, tarea.usuarios_asignados]);
 
-  // Calcular tiempo restante y estado automático
-  useEffect(() => {
-    if (estado === 'Realizada' || estado === 'Cancelada') return;
-
-    const calcularTiempoYEstado = () => {
-      if (!tarea.fecha_vencimiento) return;
-
-      const ahora = dayjs();
-      const fechaTarea = dayjs(tarea.fecha_vencimiento);
-
-      const fechaCompleta = tarea.fecha_vencimiento
-        ? fechaTarea.set('hour', tarea.hora_ejecucion?.split(':')[0] || 0)
-                   .set('minute', tarea.hora_ejecucion?.split(':')[1] || 0)
-        : fechaTarea.startOf('day');
-
-      const diff = fechaCompleta.diff(ahora, 'minute');
-
-      const dias = Math.floor(Math.abs(diff) / 1440);
-      const horas = Math.floor((Math.abs(diff) % 1440) / 60);
-      const minutos = Math.abs(diff) % 60;
-
+useEffect(() => {
+  if (estado === 'Realizada' || estado === 'Cancelada') {
+    // Si la tarea está realizada o cancelada, mostrar la demora registrada
+    if (tarea.demora) {
+      const demoraNum = parseInt(tarea.demora);
+      const dias = Math.floor(Math.abs(demoraNum) / 1440);
+      const horas = Math.floor((Math.abs(demoraNum) % 1440) / 60);
+      const minutos = Math.abs(demoraNum) % 60;
+      
       const tiempoStr = `${dias > 0 ? `${dias}d ` : ''}${horas > 0 ? `${horas}h ` : ''}${minutos}m`;
+      setDemora(tiempoStr);
+      setTiempoRestante(tiempoStr);
+    }
+    return;
+  }
 
-      if (diff <= 0) {
-        setTiempoRestante(`${tiempoStr}`);
-        setEstado(tarea.estado === 'Realizada' ? 'Realizada' : 'Vencida');
-      } else if (diff <= 30) {
-        setTiempoRestante(`${tiempoStr}`);
-        setEstado('Por vencer');
-      } else {
-        setTiempoRestante(`${tiempoStr}`);
-        setEstado('Pendiente');
-      }
-    };
+  const calcularTiempoYEstado = () => {
+    if (!tarea.fecha_vencimiento) return;
 
-    calcularTiempoYEstado();
-    const interval = setInterval(calcularTiempoYEstado, 60000);
-    
-    return () => clearInterval(interval);
-  }, [tarea.fecha_vencimiento, tarea.hora_ejecucion, estado]);
-
-  const calcularDemora = () => {
     const ahora = dayjs();
-    const fechaVencimiento = dayjs(tarea.fecha_vencimiento)
-      .set('hour', tarea.hora_ejecucion?.split(':')[0] || 0)
-      .set('minute', tarea.hora_ejecucion?.split(':')[1] || 0);
-    
-    const minutosDemora = ahora.diff(fechaVencimiento, 'minute');
-    
-    return {
-      minutos: minutosDemora > 0 ? minutosDemora : 0,
-      formateada: minutosDemora > 0 ? 
-        `${Math.floor(minutosDemora / 1440)}d ${Math.floor((minutosDemora % 1440) / 60)}h ${minutosDemora % 60}m` : 
-        '0m'
-    };
-  };
+    const fechaTarea = dayjs(tarea.fecha_vencimiento);
 
-  const marcarComoRealizada = async (e) => {
-    e.stopPropagation();
-    setLoading(true);
+    const fechaCompleta = tarea.hora_ejecucion
+      ? fechaTarea
+          .set('hour', tarea.hora_ejecucion.split(':')[0])
+          .set('minute', tarea.hora_ejecucion.split(':')[1])
+      : fechaTarea.startOf('day');
 
-    try {
-      // 1. Obtener usuario actual
-      const { data: { user }, error: userError } = await supabase.auth.getUser();
-      if (userError || !user) throw new Error('No se pudo obtener el usuario');
+    const diff = fechaCompleta.diff(ahora, 'minute');
 
-      // 2. Calcular demora
-      const { minutos, formateada } = calcularDemora();
+    const dias = Math.floor(Math.abs(diff) / 1440);
+    const horas = Math.floor((Math.abs(diff) % 1440) / 60);
+    const minutos = Math.abs(diff) % 60;
 
-      // 3. Calcular próxima fecha de ejecución si es recurrente
-      if (tarea.tipo_recurrencia && tarea.tipo_recurrencia !== 'única' && tarea.activa) {
-        const proximaFecha = calcularProximaFecha(tarea);
-        
-        // Actualizar programadas con la próxima ejecución
-        await supabase
-          .from('programadas')
-          .update({
-            proxima_ejecucion: proximaFecha
-          })
-          .eq('id', tarea.id_prog);
-      }
+    const tiempoStr = `${dias > 0 ? `${dias}d ` : ''}${horas > 0 ? `${horas}h ` : ''}${minutos}m`;
 
-      // 4. Actualizar registro en registro_programadas
-      const { error: updateError } = await supabase
-        .from('registro_programadas')
-        .update({
-          estado: 'Realizada',
-          fecha_finalizado: new Date().toISOString(),
-          finalizo: user.id,
-          demora: minutos.toString()
-        })
-        .eq('id_prog', tarea.id);
-
-      if (updateError) throw updateError;
-
-      // 5. Actualización optimista mínima (opcional)
-      onComplete(tarea.id, 'Realizada'); // Solo para notificar al componente padre
-
-    } catch (error) {
-      console.error('Error al completar tarea:', error);
-      alert(`Error: ${error.message}`);
-    } finally {
-      setLoading(false);
+    if (diff <= 0) {
+      setTiempoRestante(tiempoStr);
+      setEstado(tarea.estado === 'Realizada' ? 'Realizada' : 'Vencida');
+    } else if (diff <= 30) {
+      setTiempoRestante(tiempoStr);
+      setEstado('Por vencer');
+    } else {
+      setTiempoRestante(tiempoStr);
+      setEstado('Pendiente');
     }
   };
 
+  calcularTiempoYEstado();
+  const interval = setInterval(calcularTiempoYEstado, 60000); // Cambiado a 60 segundos
+  
+  return () => clearInterval(interval);
+}, [tarea.fecha_vencimiento, tarea.hora_ejecucion, estado, tarea.demora, tarea.estado]);
+
+const calcularDemora = () => {
+  if (!tarea.fecha_vencimiento) return { minutos: 0, formateada: '0m' };
+
+  const ahora = dayjs();
+  const fechaVencimiento = dayjs(tarea.fecha_vencimiento)
+    .set('hour', tarea.hora_ejecucion?.split(':')[0] || 0)
+    .set('minute', tarea.hora_ejecucion?.split(':')[1] || 0);
+  
+  const minutosDemora = ahora.diff(fechaVencimiento, 'minute');
+  
+  const dias = Math.floor(Math.abs(minutosDemora) / 1440);
+  const horas = Math.floor((Math.abs(minutosDemora) % 1440) / 60);
+  const minutos = Math.abs(minutosDemora) % 60;
+
+  return {
+    minutos: minutosDemora,
+    formateada: `${dias > 0 ? `${dias}d ` : ''}${horas > 0 ? `${horas}h ` : ''}${minutos}m`
+  };
+};
+const marcarComoRealizada = async (e) => {
+  e.stopPropagation();
+  setLoading(true);
+
+  try {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) throw new Error('No se pudo obtener el usuario');
+
+    const { minutos, formateada } = calcularDemora();
+    setDemora(formateada); // Actualizar estado local
+
+    if (tarea.tipo_recurrencia && tarea.tipo_recurrencia !== 'unica' && tarea.activa) {
+      const proximaFecha = calcularProximaFecha(tarea);
+      await supabase
+        .from('programadas')
+        .update({ proxima_ejecucion: proximaFecha })
+        .eq('id', tarea.id_prog);
+    }
+
+    const { error } = await supabase
+      .from('registro_programadas')
+      .update({
+        estado: 'Realizada',
+        fecha_finalizado: new Date().toISOString(),
+        finalizo: user.id,
+        demora: minutos.toString()
+      })
+      .eq('id_prog', tarea.id);
+
+    if (error) throw error;
+
+    setEstado('Realizada');
+    onComplete(tarea.id, 'Realizada');
+
+  } catch (error) {
+    console.error('Error al completar tarea:', error);
+    alert(`Error: ${error.message}`);
+  } finally {
+    setLoading(false);
+  }
+};
+
+const cancelarTarea = async (e) => {
+  e.stopPropagation();
+  setCancelLoading(true);
+
+  try {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) throw new Error('No se pudo obtener el usuario');
+
+    const { minutos, formateada } = calcularDemora();
+    setDemora(formateada); // Actualizar estado local
+
+    const { error } = await supabase
+      .from('registro_programadas')
+      .update({
+        estado: 'Cancelada',
+        fecha_finalizado: new Date().toISOString(),
+        finalizo: user.id,
+        demora: minutos.toString()
+      })
+      .eq('id', tarea.registro_id);
+
+    if (error) throw error;
+
+    setEstado('Cancelada');
+    onComplete(tarea.registro_id, 'Cancelada');
+
+  } catch (error) {
+    console.error('Error al cancelar tarea:', error);
+    toast.error(`Error al cancelar tarea: ${error.message}`);
+  } finally {
+    setCancelLoading(false);
+  }
+};
   const calcularProximaFecha = (tarea) => {
     const fechaActual = dayjs(tarea.fecha_vencimiento);
     
@@ -176,43 +218,7 @@ useEffect(() => {
     }
   };
 
-const cancelarTarea = async (e) => {
-  e.stopPropagation();
-  setCancelLoading(true);
 
-  try {
-    // 1. Actualización optimista (cambia el estado inmediatamente)
-    onComplete(tarea.registro_id, 'Cancelada'); // Notifica al componente padre
-
-    // 2. Obtener usuario actual
-    const { data: { user }, error: userError } = await supabase.auth.getUser();
-    if (userError || !user) throw new Error('No se pudo obtener el usuario');
-
-    // 3. Calcular demora
-    const { minutos } = calcularDemora();
-
-    // 4. Actualizar registro principal
-    const updatePromise = supabase
-      .from('registro_programadas')
-      .update({
-        estado: 'Cancelada',
-        fecha_finalizado: new Date().toISOString(),
-        finalizo: user.id,
-        demora: minutos.toString()
-      })
-      .eq('id', tarea.registro_id); // Cambiado a registro_id que es el ID directo
-
-    // 5. Ejecutar operación y refrescar en segundo plano
-    await updatePromise;
-  } catch (error) {
-    console.error('Error al cancelar tarea:', error);
-    // Revertir la actualización optimista en caso de error
-    onComplete(tarea.registro_id, tarea.estado);
-    toast.error(`Error al cancelar tarea: ${error.message}`);
-  } finally {
-    setCancelLoading(false);
-  }
-};
   const getEstadoStyles = () => {
     switch (estado) {
       case 'Realizada': return 'bg-success';
@@ -247,6 +253,15 @@ const cancelarTarea = async (e) => {
     return `${hora}`;
   };
 
+  const formatDemora = (demora) => {
+  const minutos = parseInt(demora);
+  const dias = Math.floor(Math.abs(minutos) / 1440);
+  const horas = Math.floor((Math.abs(minutos) % 1440) / 60);
+  const mins = Math.abs(minutos) % 60;
+  
+  return `${dias > 0 ? `${dias}d ` : ''}${horas > 0 ? `${horas}h ` : ''}${mins}m`;
+};
+
 return (
     <div
       className={`card mb-2 border-${selected ? 'light' : 'secondary'}`}
@@ -269,6 +284,7 @@ return (
             <small className="text-white" style={{ fontSize: '0.8rem' }}>
               {getHoraProgramada()}
             </small>
+          
           </div>
           <h6 className="card-title mb-0 text-white" style={{ fontSize: '1rem', flex: 1, margin: '0 8px' }}>
             {tarea.descripcion}
@@ -277,19 +293,21 @@ return (
             <span className={`badge ${getEstadoStyles()} mb-1`}>
               {estado} 
             </span>
-            <small className={
-              estado === 'Vencida' ? 'text-danger' :
-              estado === 'Por vencer' ? 'text-warning' : 
-              estado === 'Realizada' ? 'text-success' :
-              estado === 'Cancelada' ? 'text-secondary' : 'text-white'
-            } style={{ 
-              fontWeight: '650', 
-              fontSize: '0.7rem',
-              textAlign: 'center',
-              width: '100%'
-            }}>
-              {estado === 'Realizada' || estado === 'Cancelada' ? (demora || '0m') : tiempoRestante}
-            </small>
+<small className={
+  estado === 'Vencida' ? 'text-danger' :
+  estado === 'Por vencer' ? 'text-warning' : 
+  estado === 'Realizada' ? 'text-success' :
+  estado === 'Cancelada' ? 'text-secondary' : 'text-white'
+} style={{ 
+  fontWeight: '650', 
+  fontSize: '0.7rem',
+  textAlign: 'center',
+  width: '100%'
+}}>
+  {estado === 'Realizada' || estado === 'Cancelada' ? 
+    (demora || (tarea.demora ? formatDemora(tarea.demora) : '0m')) : 
+    tiempoRestante}
+</small>
           </div>       
         </div>
 
