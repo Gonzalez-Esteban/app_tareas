@@ -34,7 +34,7 @@ const ModalTareasProgramadas = forwardRef(({
         // Parsear fecha y hora
         const fechaHora = dayjs(tarea.fecha_vencimiento);
         setFechaVencimiento(fechaHora.format('YYYY-MM-DD'));
-        setHoraEjecucion(tarea.hora_ejecucion || new Date().toTimeString().slice(0, 5));
+        //setHoraEjecucion(tarea.hora_ejecucion || new Date().toTimeString().slice(0, 5));
       } else {
         // Resetear para nueva tarea usando valores actuales
         setDescripcion('');
@@ -157,7 +157,7 @@ const ModalTareasProgramadas = forwardRef(({
         descripcion,
         usuarios_asignados: usuariosSeleccionados.map(u => u.id),
         fecha_vencimiento: fechaHoraCompleta,
-        hora_ejecucion: horaEjecucion,
+        //hora_ejecucion: horaEjecucion,
         tipo_recurrencia: tipoRecurrencia === 'unica' ? 'unica' : tipoRecurrencia,
         proxima_ejecucion: proximaEjecucion,
         //dias_recurrencia: tipoRecurrencia === 'diaria' ? diasRecurrencia : null,

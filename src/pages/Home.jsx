@@ -204,6 +204,7 @@ const cargarProgramadas = async () => {
     toast.error('Error al cargar tareas programadas');
   }
 };
+
 const calcularProximaFecha = (tarea) => {
   if (!tarea?.fecha_vencimiento) return null;
 
