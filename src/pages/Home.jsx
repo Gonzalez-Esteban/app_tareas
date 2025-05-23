@@ -57,7 +57,6 @@ export default function Home({ usuario }) {
         setTareaSeleccionada(null);
       }
     };
-
     document.addEventListener('mousedown', handleClickOutside);
     return () => {
       document.removeEventListener('mousedown', handleClickOutside);
