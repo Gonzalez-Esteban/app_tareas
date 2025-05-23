@@ -70,52 +70,42 @@ useEffect(() => {
     }
     return;
   }
+const calcularTiempoYEstado = () => {
+  if (!tarea.fecha_vencimiento) return;
 
-  const calcularTiempoYEstado = () => {
-    if (!tarea.fecha_vencimiento) return;
+  const ahora = dayjs();
+  const fechaTarea = dayjs(tarea.fecha_vencimiento); // Ya incluye la hora si existe
 
-    const ahora = dayjs();
-    const fechaTarea = dayjs(tarea.fecha_vencimiento);
+  const diff = fechaTarea.diff(ahora, 'minute'); // Comparación directa con la fecha/hora completa
 
-    const fechaCompleta = tarea.hora_ejecucion
-      ? fechaTarea
-          .set('hour', tarea.hora_ejecucion.split(':')[0])
-          .set('minute', tarea.hora_ejecucion.split(':')[1])
-      : fechaTarea.startOf('day');
+  const dias = Math.floor(Math.abs(diff) / 1440);
+  const horas = Math.floor((Math.abs(diff) % 1440) / 60);
+  const minutos = Math.abs(diff) % 60;
 
-    const diff = fechaCompleta.diff(ahora, 'minute');
+  const tiempoStr = `${dias > 0 ? `${dias}d ` : ''}${horas > 0 ? `${horas}h ` : ''}${minutos}m`;
 
-    const dias = Math.floor(Math.abs(diff) / 1440);
-    const horas = Math.floor((Math.abs(diff) % 1440) / 60);
-    const minutos = Math.abs(diff) % 60;
-
-    const tiempoStr = `${dias > 0 ? `${dias}d ` : ''}${horas > 0 ? `${horas}h ` : ''}${minutos}m`;
-
-    if (diff <= 0) {
-      setTiempoRestante(tiempoStr);
-      setEstado(tarea.estado === 'Realizada' ? 'Realizada' : 'Vencida');
-    } else if (diff <= 30) {
-      setTiempoRestante(tiempoStr);
-      setEstado('Por vencer');
-    } else {
-      setTiempoRestante(tiempoStr);
-      setEstado('Pendiente');
-    }
-  };
-
+  if (diff <= 0) {
+    setTiempoRestante(tiempoStr);
+    setEstado(tarea.estado === 'Realizada' ? 'Realizada' : 'Vencida');
+  } else if (diff <= 30) {
+    setTiempoRestante(tiempoStr);
+    setEstado('Por vencer');
+  } else {
+    setTiempoRestante(tiempoStr);
+    setEstado('Pendiente');
+  }
+};
   calcularTiempoYEstado();
   const interval = setInterval(calcularTiempoYEstado, 60000); // Cambiado a 60 segundos
   
   return () => clearInterval(interval);
-}, [tarea.fecha_vencimiento, tarea.hora_ejecucion, estado, tarea.demora, tarea.estado]);
+}, [tarea.fecha_vencimiento, estado, tarea.demora, tarea.estado]);
 
 const calcularDemora = () => {
   if (!tarea.fecha_vencimiento) return { minutos: 0, formateada: '0m' };
 
   const ahora = dayjs();
-  const fechaVencimiento = dayjs(tarea.fecha_vencimiento)
-    .set('hour', tarea.hora_ejecucion?.split(':')[0] || 0)
-    .set('minute', tarea.hora_ejecucion?.split(':')[1] || 0);
+  const fechaVencimiento = dayjs(tarea.fecha_vencimiento); // Usa la fecha/hora directamente
   
   const minutosDemora = ahora.diff(fechaVencimiento, 'minute');
   
@@ -128,6 +118,8 @@ const calcularDemora = () => {
     formateada: `${dias > 0 ? `${dias}d ` : ''}${horas > 0 ? `${horas}h ` : ''}${minutos}m`
   };
 };
+
+
 const marcarComoRealizada = async (e) => {
   e.stopPropagation();
   setLoading(true);

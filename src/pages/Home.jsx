@@ -13,6 +13,7 @@ import Pedidos from '../components/Pedidos';
 import ModalTareasProgramadas from '../components/ModalTareasProgramadas';
 import TarjetaProgramada from "../components/TarjetaProgramada";
 import { toast } from 'react-toastify';
+import Sidebar from '../components/sidebar';
 dayjs.extend(duration);
 dayjs.extend(utc);
 dayjs.extend(timezone);
@@ -43,7 +44,7 @@ export default function Home({ usuario }) {
   const [showProgramadasModal, setShowProgramadasModal] = useState(false);
   const [filtroProgEstado, setFiltroProgEstado] = useState(null);
   const [filtroProgUsuario, setFiltroProgUsuario] = useState(null);
-  const [mostrarSoloPendientes, setMostrarSoloPendientes] = useState(false);
+  const [mostrarSoloPendientes, setMostrarSoloPendientes] = useState(true);
   const [localRefresh, setLocalRefresh] = useState(0);
   const tareasRef = useRef(null);
   const accionesRef = useRef(null);
@@ -450,10 +451,9 @@ const cargarTareasPendientes = async () => {
     setShowPedidosModal(false);
     setPedidoEditando(null);
   };
-
   return (
     <div style={{ minHeight: "100vh", width: "100%", backgroundColor: "#2d3748", color: "white" }}>
-      {/* Navbar (se mantiene exactamente igual) */}
+      {/* Navbar */}
       <nav className="navbar navbar-dark bg-dark fixed-top">
         <div className="container-fluid d-flex justify-content-between align-items-center" ref={containerRef}
           onClick={(e) => {
@@ -464,12 +464,11 @@ const cargarTareasPendientes = async () => {
           }}
           style={{ borderWidth: '2px', fontWeight: '700', fontSize: '1rem', color: '#a0aec0' }}
         >
-
           <span className="navbar-brand mb-0 h2" style={{ color: '#a0aec0' }}>
             {saludo}, {usuario?.nombre || "Usuario"}!
           </span>
 
-          <div className="d-flex align-items-center gap-2" >
+          <div className="d-flex align-items-center gap-2">
             {!pedidoSeleccionado ? (
               <>
                 <button
@@ -477,21 +476,20 @@ const cargarTareasPendientes = async () => {
                   onClick={abrirNuevoPedido}
                   style={{ borderWidth: 'px', fontWeight: '600', fontSize: '1rem', color: '#a0aec0' }}
                 >
-                  <i className="bi bi-clipboard-plus me-2" ></i> Pedido
+                  <i className="bi bi-clipboard-plus me-2"></i> Pedido
                 </button>
                 <button
                   className="btn btn-outline-secondary me-1"
                   onClick={() => abrirModalProgramadas()}
                   style={{ borderWidth: 'px', fontWeight: '600', fontSize: '1rem', color: '#a0aec0' }}
                 >
-                  <i className="bi bi-calendar2-plus" ></i> Programada
+                  <i className="bi bi-calendar2-plus"></i> Programada
                 </button>
                 <button
                   className="btn btn-outline-secondary me-1"
-
                   style={{ borderWidth: 'px', fontWeight: '600', fontSize: '1rem', color: '#a0aec0' }}
                 >
-                  <i className="bi bi-journal-plus" ></i> Proyecto
+                  <i className="bi bi-journal-plus"></i> Proyecto
                 </button>
               </>
             ) : (
@@ -556,7 +554,7 @@ const cargarTareasPendientes = async () => {
                   <a className="nav-link dropdown-toggle" href="#" role="button" data-bs-toggle="dropdown">
                     Filtrar por Sector
                   </a>
-                  <ul className="dropdown-menu" >
+                  <ul className="dropdown-menu">
                     <li><button className="dropdown-item" onClick={() => { setFiltroSector(null); cargarPedidos(); }}>Todos</button></li>
                     {sectores.map(sector => (
                       <li key={sector.id}>
@@ -596,233 +594,29 @@ const cargarTareasPendientes = async () => {
         </div>
       </nav>
 
-      {/* Sidebar modificado */}
-      <div style={{
-        display: 'flex',
-        height: 'calc(180vh - 80px)',
-        marginTop: '50px',
-        position: 'static',
-        overflow: 'hidden',
-        overflowY: 'auto',
-        width: '100%'
-      }}>
+      {/* Sidebar y contenido principal */}
+      <div className="d-flex" style={{ paddingTop: "56px" }}>
+        <Sidebar
+          isSidebarCollapsed={isSidebarCollapsed}
+          setIsSidebarCollapsed={setIsSidebarCollapsed}
+          tareasProgramadas={tareasProgramadas}
+          tareaSeleccionada={tareaSeleccionada}
+          setTareaSeleccionada={setTareaSeleccionada}
+          abrirModalProgramadas={abrirModalProgramadas}
+          cargarProgramadas={cargarProgramadas}
+          supabase={supabase}
+          mostrarSoloPendientes={mostrarSoloPendientes}
+          setMostrarSoloPendientes={setMostrarSoloPendientes}
+          loading={loading}
+        />
 
-        {/* Sidebar */}
-        <div
-          className="sidebar-scroll "
-          style={{
-            width: isSidebarCollapsed ? '50px' : '390px',
-            backgroundColor: '#212529',
-            overflowY: 'auto',
-            transition: 'width 0.3s ease',
-            position: 'sticky',
-            flexShrink: 0,
-            borderRight: '1px solid #4a5568',
-            display: 'flex',
-            flexDirection: 'column',
-            border: '1px solid #4a5568',
-            height: '100%',
-            scrollbarWidth: 'thin',
-            scrollbarColor: '#444 #212529'
-            
-          }}
-        >
-          {/* Cabecera del sidebar */}
-          <div style={{
-            padding: '10px',
-            position: 'sticky',
-            top: 0,
-            backgroundColor: '#212529',
-            zIndex: 1,
-            display: 'flex',
-            justifyContent: 'space-between',
-            borderTop: '1px solid #4a5568',
-            alignItems: 'center',
-            borderBottom: '1px solid #2d3748',
-            minHeight: '40px'
-          }}>
-            {!isSidebarCollapsed && (
-
-              <h6 style={{ color: '#a0aec0', whiteSpace: 'normal' }}>
-                <i className="bi bi-calendar3 me-1"> </i>
-                Programadas
-              </h6>
-            )}
-            <button
-              onClick={() => setIsSidebarCollapsed(!isSidebarCollapsed)}
-              style={{
-                background: 'none',
-                border: 'none',
-                color: '#a0aec0',
-                cursor: 'pointer',
-                padding: '8px',
-                flexShrink: 0,
-                marginLeft: isSidebarCollapsed ? '0' : 'auto'
-              }}
-            >
-              <i className={`bi bi-chevron-${isSidebarCollapsed ? 'right' : 'left'}`}></i>
-            </button>
-          </div>
-
-          {/* Botones de acción (solo cuando hay tarea seleccionada) */}
-          {!isSidebarCollapsed && (
-            <div style={{
-              padding: '10px',
-              borderBottom: '1px solid #4a5568',
-              display: 'flex',
-              gap: '8px',
-              justifyContent: 'flex-end'
-            }} ref={accionesRef}> {/* Agregada referencia aquí */}
-              {tareaSeleccionada ? (
-                <>
-                  <button
-                    className="btn btn-sm btn-outline-warning me-2"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      abrirModalProgramadas(tareaSeleccionada);
-                    }}
-                  >
-                    <i className="bi bi-pencil"></i>
-                  </button>
-                  <button
-                    className="btn btn-sm btn-outline-danger me-2"
-                    onClick={async (e) => {
-                      e.stopPropagation();
-                      if (window.confirm('¿Eliminar esta tarea programada?')) {
-                        await supabase.from('programadas').delete().eq('id', tareaSeleccionada.id);
-                        cargarProgramadas();
-                        setTareaSeleccionada(null);
-                      }
-                    }}
-                  >
-                    <i className="bi bi-trash"></i>
-                  </button>
-                </>
-              ) : (
-                <>
-
-        <div className="form-check form-switch" style={{ marginRight: '52%' }}>
-          <input
-            className="form-check-input"
-            type="checkbox"
-            id="filtroPendientes"
-            checked={mostrarSoloPendientes}
-            onChange={() => {
-              setMostrarSoloPendientes(!mostrarSoloPendientes);
-              setTareaSeleccionada(null); // Limpiar selección al cambiar filtro
-            }}
-            style={{
-              backgroundColor: mostrarSoloPendientes ? '#a0aec0' : '#4a5568',
-              borderColor: mostrarSoloPendientes ? '#a0aec0' : '#4a5568',
-            }}
-          />
-          <label
-            className="form-check-label"
-            htmlFor="filtroPendientes"
-            style={{
-              color: '#a0aec0',
-              fontSize: '0.9rem',
-              fontWeight: '600',
-            }}
-          >
-
-                      Pendientes
-                    </label>
-                  </div>
-                  <button
-                    className="btn btn-sm btn-outline-primary me-2"
-                    onClick={() => abrirModalProgramadas()}
-                  >
-                    <i className="bi bi-calendar2-plus"></i>
-                  </button>
-                </>
-              )}
-            </div>
-          )}
-
-          {/* Contenido del sidebar */}
-          <div style={{
-            flex: 1,
-            overflowY: 'auto',
-            padding: isSidebarCollapsed ? '16px 8px' : '16px',
-            display: 'flex',
-            flexDirection: 'column'
-          }}>
-            {isSidebarCollapsed ? (
-              <div style={{
-                display: 'flex',
-                flexDirection: 'column',
-                alignItems: 'center',
-                color: '#a0aec0',
-                height: '100%'
-              }}>
-                <i className="bi bi-calendar3" style={{ fontSize: '1.2rem', marginBottom: '8px' }}></i>
-                {tareasProgramadas.length > 0 && (
-                  <span className="badge bg-danger rounded-pill">
-                    {tareasProgramadas.filter(t => t.estado !== 'Realizada').length}
-                  </span>
-                )}
-              </div>
-            ) : (
-              <>
-                {loading ? (
-                  <div className="text-center my-4">
-                    <div className="spinner-border spinner-border-sm text-light" role="status"></div>
-                  </div>
-                ) : tareasFiltradas.length === 0 ? (
-                  <div className="text-center py-4 text-secondary">
-                    <i className="bi bi-calendar-x" style={{ fontSize: '2rem' }}></i>
-                    <p>Sin tareas {mostrarSoloPendientes ? 'pendientes' : 'programadas'}</p>
-                  </div>
-                ) : (
-                    <div className="d-flex flex-column gap-2" ref={tareasContainerRef}>
-              {tareasFiltradas.map(tarea => (
-                <TarjetaProgramada
-                  key={tarea.registro_id}
-                  tarea={tarea}
-                  selected={tareaSeleccionada?.registro_id === tarea.registro_id}
-                  onSelect={(registro_id) =>
-                    setTareaSeleccionada(tareasFiltradas.find(t => t.registro_id === registro_id))
-                  }
-                  onComplete={async (registro_id, nuevoEstado) => {
-                    // 1. Actualización optimista inmediata
-                    setTareasProgramadas(prev =>
-                      prev.map(t =>
-                        t.registro_id === registro_id ? { ...t, estado: nuevoEstado } : t
-                      )
-                    );
-
-                    try {
-                      // 2. Persistencia en la base de datos
-                      const { error } = await supabase
-                        .from('registro_programadas')
-                        .update({ estado: nuevoEstado })
-                        .eq('id', registro_id);
-
-                      if (error) throw error;
-
-                      // 3. Refrescá en segundo plano si querés garantizar consistencia
-                      cargarProgramadas(); // SIN setTimeout
-                    } catch (error) {
-                      console.error("Error actualizando estado:", error);
-                      // (Opcional) Mostrar alerta al usuario o revertir cambios si hace falta
-                    }
-                  }}
-                />
-              ))}
-
-              </div>
-                )}
-              </>
-            )}
-          </div>
-        </div>
-
-        {/* Contenido principal (se mantiene igual) */}
+        {/* Contenido principal */}
         <div style={{
           flexGrow: 1,
           overflowY: 'auto',
-          padding: '20px'
+          padding: '20px',
+          marginLeft: isSidebarCollapsed ? '50px' : '390px',
+          transition: 'margin-left 0.3s ease'
         }}>
           <h4 style={{ fontSize: '1.2rem', color: '#a0aec0', marginBottom: '20px' }}>Diarios</h4>
 
@@ -847,7 +641,7 @@ const cargarTareasPendientes = async () => {
               cargarProgramadas();
               setShowProgramadasModal(false);
             }}
-            tarea={null} // Puedes pasar una tarea existente aquí si estás editando
+            tarea={null}
           />
 
           {/* Modal de Tareas */}
@@ -890,13 +684,10 @@ const cargarTareasPendientes = async () => {
               {(() => {
                 const hoy = dayjs().startOf('day');
                 const ayer = hoy.subtract(1, 'day');
+                const limiteAntiguedad = dayjs().subtract(4, 'day').startOf('day');
 
                 const pedidosHoy = pedidos.filter(p => dayjs(p.created_at).isAfter(hoy));
                 const pedidosAyer = pedidos.filter(p => dayjs(p.created_at).isAfter(ayer) && dayjs(p.created_at).isBefore(hoy));
-                //const pedidosAntiguos = pedidos.filter(p => dayjs(p.created_at).isBefore(ayer));
-                //const ayer = dayjs().subtract(1, 'day').endOf('day');
-                const limiteAntiguedad = dayjs().subtract(4, 'day').startOf('day'); // 3 días antes de ayer
-
                 const pedidosAntiguos = pedidos.filter(p => {
                   const fechaPedido = dayjs(p.created_at);
                   return fechaPedido.isBefore(ayer) && fechaPedido.isAfter(limiteAntiguedad);
@@ -913,11 +704,10 @@ const cargarTareasPendientes = async () => {
                             display: "grid",
                             gap: "16px",
                             gridTemplateColumns: "repeat(auto-fit, minmax(310px, 360px))",
-                            justifyContent: "flex-start", // o "center" si querés centrarlas
+                            justifyContent: "flex-start",
                           }}
                         >
                           {pedidosHoy.map(pedido => (
-
                             <TarjetaPedidos
                               key={pedido.id}
                               pedido={pedido}
@@ -940,12 +730,9 @@ const cargarTareasPendientes = async () => {
                               selectedPedidoId={pedidoSeleccionado?.id}
                               selectedTareaId={tareaSeleccionada}
                             />
-
                           ))}
                         </div>
                       </div>
-
-
                     )}
 
                     {/* AYER */}
@@ -958,11 +745,10 @@ const cargarTareasPendientes = async () => {
                             flexWrap: "wrap",
                             gap: "12px",
                             gridTemplateColumns: "repeat(auto-fit, minmax(310px, 360px))",
-                            justifyContent: "flex-start", // o "center" si querés centrarlas
+                            justifyContent: "flex-start",
                           }}
                         >
                           {pedidosAyer.map(pedido => (
-
                             <TarjetaPedidos
                               key={pedido.id}
                               pedido={pedido}
@@ -985,12 +771,9 @@ const cargarTareasPendientes = async () => {
                               selectedPedidoId={pedidoSeleccionado?.id}
                               selectedTareaId={tareaSeleccionada}
                             />
-
                           ))}
                         </div>
                       </div>
-
-
                     )}
 
                     {/* MÁS ANTIGUOS */}
@@ -1003,11 +786,10 @@ const cargarTareasPendientes = async () => {
                             flexWrap: "wrap",
                             gridTemplateColumns: "repeat(auto-fit, minmax(310px, 360px))",
                             gap: "16px",
-                            justifyContent: "flex-start", // o "center" si querés centrarlas
+                            justifyContent: "flex-start",
                           }}
                         >
                           {pedidosAntiguos.map(pedido => (
-
                             <TarjetaPedidos
                               key={pedido.id}
                               pedido={pedido}
@@ -1030,12 +812,9 @@ const cargarTareasPendientes = async () => {
                               selectedPedidoId={pedidoSeleccionado?.id}
                               selectedTareaId={tareaSeleccionada}
                             />
-
                           ))}
                         </div>
                       </div>
-
-
                     )}
                   </>
                 );
@@ -1046,4 +825,4 @@ const cargarTareasPendientes = async () => {
       </div>
     </div>
   );
-}
+};
