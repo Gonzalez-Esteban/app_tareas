@@ -1,25 +1,26 @@
-import React from 'react';
-import { Link } from 'react-router-dom';
+import React from "react";
+import { Link } from "react-router-dom";
 
-const Navbar = ({
-  saludo, usuario, pedidoSeleccionado, tareaSeleccionada,
-  abrirNuevoPedido, abrirModalProgramadas, abrirModalEditarTarea,
-  borrarPedido, abrirModalEdicion, abrirModalNuevaTarea,
-  setPedidoSeleccionado, setTareaSeleccionada,
-  containerRef, sectores, setFiltroSector, setFiltroEstado,
-  cargarPedidos, handleLogout
-}) => {
+export default function NavBar({ 
+  usuario, 
+  saludo, 
+  abrirNuevoPedido, 
+  abrirModalProgramadas, 
+  pedidoSeleccionado, 
+  tareaSeleccionada, 
+  borrarPedido, 
+  abrirModalEdicion, 
+  abrirModalNuevaTarea, 
+  abrirModalEditarTarea, 
+  sectores, 
+  setFiltroSector, 
+  cargarPedidos, 
+  setFiltroEstado, 
+  handleLogout 
+}) {
   return (
     <nav className="navbar navbar-dark bg-dark fixed-top">
-      <div className="container-fluid d-flex justify-content-between align-items-center" ref={containerRef}
-        onClick={(e) => {
-          if (e.target === e.currentTarget && pedidoSeleccionado) {
-            setPedidoSeleccionado(null);
-            setTareaSeleccionada(null);
-          }
-        }}
-        style={{ borderWidth: '2px', fontWeight: '700', fontSize: '1rem', color: '#a0aec0' }}
-      >
+      <div className="container-fluid d-flex justify-content-between align-items-center">
         <span className="navbar-brand mb-0 h2" style={{ color: '#a0aec0' }}>
           {saludo}, {usuario?.nombre || "Usuario"}!
         </span>
@@ -27,13 +28,24 @@ const Navbar = ({
         <div className="d-flex align-items-center gap-2">
           {!pedidoSeleccionado ? (
             <>
-              <button className="btn btn-outline-secondary me-1" onClick={abrirNuevoPedido}>
+              <button
+                className="btn btn-outline-secondary me-1"
+                onClick={abrirNuevoPedido}
+                style={{ borderWidth: 'px', fontWeight: '600', fontSize: '1rem', color: '#a0aec0' }}
+              >
                 <i className="bi bi-clipboard-plus me-2"></i> Pedido
               </button>
-              <button className="btn btn-outline-secondary me-1" onClick={abrirModalProgramadas}>
+              <button
+                className="btn btn-outline-secondary me-1"
+                onClick={() => abrirModalProgramadas()}
+                style={{ borderWidth: 'px', fontWeight: '600', fontSize: '1rem', color: '#a0aec0' }}
+              >
                 <i className="bi bi-calendar2-plus"></i> Programada
               </button>
-              <button className="btn btn-outline-secondary me-1">
+              <button
+                className="btn btn-outline-secondary me-1"
+                style={{ borderWidth: 'px', fontWeight: '600', fontSize: '1rem', color: '#a0aec0' }}
+              >
                 <i className="bi bi-journal-plus"></i> Proyecto
               </button>
             </>
@@ -41,22 +53,41 @@ const Navbar = ({
             <>
               {tareaSeleccionada ? (
                 <>
-                  <button className="btn btn-outline-danger me-2" onClick={() => abrirModalEditarTarea(pedidoSeleccionado.tareas.find(t => t.id === tareaSeleccionada))}>
+                  <button
+                    className="btn btn-outline-danger me-2"
+                    onClick={() => {
+                      abrirModalEditarTarea(pedidoSeleccionado.tareas.find(t => t.id === tareaSeleccionada));
+                    }}
+                  >
                     <i className="bi bi-trash me-1"></i> Eliminar
                   </button>
-                  <button className="btn btn-outline-warning me-2" onClick={() => abrirModalEditarTarea(pedidoSeleccionado.tareas.find(t => t.id === tareaSeleccionada))}>
+                  <button
+                    className="btn btn-outline-warning me-2"
+                    onClick={() => {
+                      abrirModalEditarTarea(pedidoSeleccionado.tareas.find(t => t.id === tareaSeleccionada));
+                    }}
+                  >
                     <i className="bi bi-pencil me-1"></i> Editar
                   </button>
                 </>
               ) : (
                 <>
-                  <button className="btn btn-outline-danger me-2" onClick={() => borrarPedido(pedidoSeleccionado.id)}>
+                  <button
+                    className="btn btn-outline-danger me-2"
+                    onClick={() => borrarPedido(pedidoSeleccionado.id)}
+                  >
                     <i className="bi bi-trash me-1"></i> Eliminar
                   </button>
-                  <button className="btn btn-outline-warning me-2" onClick={() => abrirModalEdicion(pedidoSeleccionado)}>
+                  <button
+                    className="btn btn-outline-warning me-2"
+                    onClick={() => abrirModalEdicion(pedidoSeleccionado)}
+                  >
                     <i className="bi bi-pencil me-1"></i> Editar
                   </button>
-                  <button className="btn btn-outline-primary" onClick={abrirModalNuevaTarea}>
+                  <button
+                    className="btn btn-outline-primary"
+                    onClick={abrirModalNuevaTarea}
+                  >
                     <i className="bi bi-plus-circle me-1"></i> Agregar Tarea
                   </button>
                 </>
@@ -68,6 +99,7 @@ const Navbar = ({
           </button>
         </div>
 
+        {/* Offcanvas con filtros */}
         <div className="offcanvas offcanvas-end text-bg-dark" id="offcanvasNavbar">
           <div className="offcanvas-header">
             <h5 className="offcanvas-title">Menú</h5>
@@ -76,7 +108,9 @@ const Navbar = ({
           <div className="offcanvas-body d-flex flex-column justify-content-between">
             <ul className="navbar-nav flex-grow-1">
               <li className="nav-item dropdown">
-                <a className="nav-link dropdown-toggle" href="#" data-bs-toggle="dropdown">Filtrar por Sector</a>
+                <a className="nav-link dropdown-toggle" href="#" role="button" data-bs-toggle="dropdown">
+                  Filtrar por Sector
+                </a>
                 <ul className="dropdown-menu">
                   <li><button className="dropdown-item" onClick={() => { setFiltroSector(null); cargarPedidos(); }}>Todos</button></li>
                   {sectores.map(sector => (
@@ -89,7 +123,9 @@ const Navbar = ({
                 </ul>
               </li>
               <li className="nav-item dropdown mt-2">
-                <a className="nav-link dropdown-toggle" href="#" data-bs-toggle="dropdown">Filtrar por Estado</a>
+                <a className="nav-link dropdown-toggle" href="#" role="button" data-bs-toggle="dropdown">
+                  Filtrar por Estado
+                </a>
                 <ul className="dropdown-menu">
                   <li><button className="dropdown-item" onClick={() => { setFiltroEstado(null); cargarPedidos(); }}>Todos</button></li>
                   <li><button className="dropdown-item" onClick={() => { setFiltroEstado('En proceso'); cargarPedidos(); }}>En proceso</button></li>
@@ -97,10 +133,14 @@ const Navbar = ({
                 </ul>
               </li>
               <li className="nav-item">
-                <Link className="nav-link text-white" to="/pedidos"><i className="bi bi-card-checklist me-2"></i>Pedidos</Link>
+                <Link className="nav-link text-white" to="/pedidos">
+                  <i className="bi bi-card-checklist me-2"></i>Pedidos
+                </Link>
               </li>
               <li className="nav-item">
-                <Link className="nav-link text-white" to="/proyectos"><i className="bi bi-kanban me-2"></i>Proyectos</Link>
+                <Link className="nav-link text-white" to="/proyectos">
+                  <i className="bi bi-kanban me-2"></i>Proyectos
+                </Link>
               </li>
             </ul>
             <button className="btn btn-link text-danger mt-auto" onClick={handleLogout}>
@@ -111,6 +151,4 @@ const Navbar = ({
       </div>
     </nav>
   );
-};
-
-export default Navbar;
+}
