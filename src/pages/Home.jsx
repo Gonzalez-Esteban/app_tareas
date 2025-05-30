@@ -14,6 +14,11 @@ import ModalTareasProgramadas from '../components/ModalTareasProgramadas';
 import TarjetaProgramada from "../components/TarjetaProgramada";
 import { toast } from 'react-toastify';
 import Sidebar from '../components/sidebar';
+import { useDispatch, useSelector } from 'react-redux';
+import { fetchPedidos } from '../features/pedidos/pedidosThunks';
+import { fetchSectores } from '../features/sectores/sectoresThunks';
+
+
 dayjs.extend(duration);
 dayjs.extend(utc);
 dayjs.extend(timezone);
@@ -22,17 +27,18 @@ dayjs.extend(relativeTime);
 dayjs.locale('es');
 
 export default function Home({ usuario }) {
-  const [sectores, setSectores] = useState([]);
+  const dispatch = useDispatch();
+  //const [sectores, setSectores] = useState([]);
   const [horaActual, setHoraActual] = useState("");
   const [saludo, setSaludo] = useState("");
-  const [pedidos, setPedidos] = useState([]);
+  //const [pedidos, setPedidos] = useState([]);
   const [tareasProgramadas, setTareasProgramadas] = useState([]);
   const [pedidoEditando, setPedidoEditando] = useState(null);
   const [pedidoSeleccionado, setPedidoSeleccionado] = useState(null);
   const [showPedidosModal, setShowPedidosModal] = useState(false);
   const [showTareasModal, setShowTareasModal] = useState(false);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
+  //const [loading, setLoading] = useState(true);
+  //const [error, setError] = useState(null);
   const [filtroSector, setFiltroSector] = useState(null);
   const [filtroEstado, setFiltroEstado] = useState(null);
   const [tareaSeleccionada, setTareaSeleccionada] = useState(null);
@@ -42,15 +48,19 @@ export default function Home({ usuario }) {
   const [timeRefresh, setTimeRefresh] = useState(Date.now());
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(true);
   const [showProgramadasModal, setShowProgramadasModal] = useState(false);
-  const [filtroProgEstado, setFiltroProgEstado] = useState(null);
-  const [filtroProgUsuario, setFiltroProgUsuario] = useState(null);
   const [mostrarSoloPendientes, setMostrarSoloPendientes] = useState(true);
   const [localRefresh, setLocalRefresh] = useState(0);
   const tareasRef = useRef(null);
   const accionesRef = useRef(null);
   const tareasContainerRef = useRef(null);
+
   const modalTareasProgramadasRef = useRef();
-  // Efecto para manejar clicks fuera
+
+
+  
+const { pedidos, loading: loadingPedidos, error: errorPedidos } = useSelector((state) => state.pedidos);
+const { sectores, loading: loadingSectores, error: errorSectores } = useSelector((state) => state.sectores);
+
   useEffect(() => {
     const handleClickOutside = (event) => {
       if (tareasRef.current && !tareasRef.current.contains(event.target)) {
@@ -63,7 +73,6 @@ export default function Home({ usuario }) {
     };
   }, []);
 
-  // 2. Agrega este efecto para manejar la deselección
   useEffect(() => {
     const handleClickOutside = (event) => {
       if (tareasContainerRef.current &&
@@ -79,17 +88,6 @@ export default function Home({ usuario }) {
       document.removeEventListener('mousedown', handleClickOutside);
     };
   }, [tareaSeleccionada]);
-
-// Cambia el useMemo para filtrar tareas pendientes
-const tareasFiltradas = useMemo(() => {
-  return tareasProgramadas
-    .filter(t => !mostrarSoloPendientes || t.estado.toLowerCase() === 'pendiente')
-    .sort((a, b) => {
-      const fechaA = dayjs(a.fecha_vencimiento || a.fecha + (a.hora ? `T${a.hora}` : ''));
-      const fechaB = dayjs(b.fecha_vencimiento || b.fecha + (b.hora ? `T${b.hora}` : ''));
-      return fechaA.diff(fechaB);
-    });
-}, [tareasProgramadas, mostrarSoloPendientes]);
 
   useEffect(() => {
     inicializar();
@@ -109,7 +107,6 @@ const tareasFiltradas = useMemo(() => {
     };
   }, []);
 
-    // Manejador de clic fuera
   useEffect(() => {
     const handleClickOutside = (event) => {
       if (
@@ -135,11 +132,19 @@ const tareasFiltradas = useMemo(() => {
     };
   }, [pedidoSeleccionado, showPedidosModal, showTareasModal, showProgramadasModal]);
 
-
+  useEffect(() => {
+  dispatch(fetchPedidos());
+}, [dispatch]);
+  
+  useEffect(() => {
+  dispatch(fetchSectores());
+}, [dispatch]);
+  
   const inicializar = async () => {
     actualizarHoraYSaludo();
-    await cargarSectores();
-    await cargarPedidos();
+    //await cargarSectores();
+    //await cargarPedidos();
+    dispatch(fetchPedidos());
     await cargarProgramadas();
   };
 
@@ -147,7 +152,6 @@ const tareasFiltradas = useMemo(() => {
     setLocalRefresh(prev => prev + 1);
   }, [timeRefresh]);
 
-  
   useEffect(() => {
     const interval = setInterval(() => {
       setTimeRefresh(Date.now());
@@ -156,71 +160,54 @@ const tareasFiltradas = useMemo(() => {
     return () => clearInterval(interval);
   }, []);
 
-const cargarProgramadas = async () => {
-  try {
-    const hoyInicio = dayjs().startOf('day').toISOString();
-    const hoyFin = dayjs().endOf('day').toISOString();
-    const { data: { user }, error: authError } = await supabase.auth.getUser();
-    if (authError || !user) throw new Error('No autenticado');
-    // Obtener rango del día actual
+  const cargarProgramadas = async () => {
+    try {
+      const hoyInicio = dayjs().startOf('day').toISOString();
+      const hoyFin = dayjs().endOf('day').toISOString();
+      const { data: { user }, error: authError } = await supabase.auth.getUser();
+      if (authError || !user) throw new Error('No autenticado');
+      // Obtener rango del día actual
 
-    const { data, error } = await supabase
-      .from('registro_programadas')
-      .select(`
-        id,                   
-        estado,
-        fecha_vencimiento,
-        demora,
-        id_prog,              
-        programadas (
-          id,
-          descripcion,
-          creado_por,
-          usuarios_asignados,
-          tipo_recurrencia,
-          activa
-        )
-      `)
-      .eq('programadas.activa', true)
-      .gte('fecha_vencimiento', hoyInicio)
-      .lte('fecha_vencimiento', hoyFin)
-      .order('fecha_vencimiento', { ascending: true });
+      const { data, error } = await supabase
+        .from('registro_programadas')
+        .select(`
+          id,                   
+          estado,
+          fecha_vencimiento,
+          demora,
+          id_prog,              
+          programadas (
+            id,
+            descripcion,
+            creado_por,
+            usuarios_asignados,
+            tipo_recurrencia,
+            activa
+          )
+        `)
+        .eq('programadas.activa', true)
+        .gte('fecha_vencimiento', hoyInicio)
+        .lte('fecha_vencimiento', hoyFin)
+        .order('fecha_vencimiento', { ascending: true });
 
-    if (error) throw error;
+      if (error) throw error;
 
-    // Filtramos y mapeamos manteniendo el ID del registro
-    const tareasFiltradas = data
-      .filter(item => item.programadas !== null)
-      .map(r => ({
-        ...r,  // Conserva todos los campos del registro
-        ...r.programadas,  // Combina con los datos de programadas
-        registro_id: r.id,  // ID único para usar como key
-      }));
+      // Filtramos y mapeamos manteniendo el ID del registro
+      const tareasFiltradas = data
+        .filter(item => item.programadas !== null)
+        .map(r => ({
+          ...r,  // Conserva todos los campos del registro
+          ...r.programadas,  // Combina con los datos de programadas
+          registro_id: r.id,  // ID único para usar como key
+        }));
 
-    setTareasProgramadas(tareasFiltradas);
+      setTareasProgramadas(tareasFiltradas);
 
-  } catch (error) {
-    console.error('Error al cargar tareas programadas:', error);
-    toast.error('Error al cargar tareas programadas');
-  }
-};
-
-const calcularProximaFecha = (tarea) => {
-  if (!tarea?.fecha_vencimiento) return null;
-
-  const fechaActual = dayjs(tarea.fecha_vencimiento);
-  
-  switch(tarea.tipo_recurrencia) {
-    case 'diaria':
-      return fechaActual.add(tarea.intervalo_recurrencia || 1, 'day').toISOString();
-    case 'semanal':
-      return fechaActual.add(tarea.intervalo_recurrencia || 1, 'week').toISOString();
-    case 'mensual':
-      return fechaActual.add(tarea.intervalo_recurrencia || 1, 'month').toISOString();
-    default:
-      return null; // Si no es recurrente, no calcula próxima fecha
-  }
-};
+    } catch (error) {
+      console.error('Error al cargar tareas programadas:', error);
+      toast.error('Error al cargar tareas programadas');
+    }
+  };
 
   useEffect(() => {
     const handleResize = () => {
@@ -239,15 +226,6 @@ const calcularProximaFecha = (tarea) => {
     return () => window.removeEventListener('resize', handleResize);
   }, []);
 
-  const cargarSectores = async () => {
-    const { data, error } = await supabase.from("sectores").select("*");
-    if (error) {
-      console.error("Error cargando sectores:", error.message);
-    } else {
-      setSectores(data);
-    }
-  };
-
   const actualizarHoraYSaludo = () => {
     const ahora = new Date();
     const hora = ahora.getHours();
@@ -262,85 +240,6 @@ const calcularProximaFecha = (tarea) => {
     setHoraActual(`${fechaActual}T${horaStr}`);
   };
 
-  const cargarPedidos = async () => {
-    setLoading(true);
-    try {
-      let query = supabase
-        .from('pedidos')
-        .select('*, tareas(*)')
-        .order('created_at', { ascending: false });
-
-      if (filtroSector) {
-        query = query.eq('sector_id', filtroSector);
-      }
-
-      if (filtroEstado) {
-        query = query.eq('estado', filtroEstado);
-      }
-
-      const { data, error } = await query;
-
-      if (error) throw error;
-
-      setPedidos(data || []);
-      setError(null);
-    } catch (err) {
-      console.error("Error cargando pedidos:", err);
-      setError("Error al cargar pedidos");
-    } finally {
-      setLoading(false);
-    }
-  };
-
-const cargarTareasPendientes = async () => {
-  setLoading(true);
-  try {
-    // Obtener rango del día actual
-    const hoyInicio = dayjs().startOf('day').toISOString();
-    const hoyFin = dayjs().endOf('day').toISOString();
-
-    const { data, error } = await supabase
-      .from('registro_programadas')
-      .select(`
-        *,
-        programada: id_programada (
-          *,
-          historial: registro_programadas (
-            *,
-            usuario: create_for (*)
-          )
-        )
-      `)
-      .eq('estado', 'pendiente')
-      .gte('fecha_vencimiento', hoyInicio)
-      .lte('fecha_vencimiento', hoyFin)
-      .order('fecha_ejecucion', { ascending: true });
-
-    if (error) throw error;
-    setTareasProgramadas(data || []);
-  } catch (err) {
-    console.error("Error cargando tareas:", err);
-    setError("Error al cargar tareas");
-  } finally {
-    setLoading(false);
-  }
-};
-
-
-  const completarTarea = async (idRegistro, estado) => {
-  try {
-    // Actualizar registro
-    await supabase
-      .from('registro_programadas')
-      .update({ estado })
-      .eq('id', idRegistro);
-    
-    // Recargar tareas
-    await cargarTareasPendientes();
-  } catch (error) {
-    console.error("Error completando tarea:", error);
-  }
-};
 
   const borrarPedido = async (id) => {
     if (!window.confirm("¿Estás seguro de borrar este pedido?")) return;
@@ -412,7 +311,6 @@ const cargarTareasPendientes = async () => {
     }
   };
 
-  // Función para abrir modal en modo creación
   const abrirModalNuevaTarea = () => {
     setModoTarea('crear');
     setTareaEditando(null);
@@ -428,13 +326,11 @@ const cargarTareasPendientes = async () => {
     setShowProgramadasModal(true);
   };
 
-  // Función para abrir modal en modo edición
   const abrirModalEditarTarea = (tarea) => {
     setModoTarea('editar');
     setTareaEditando(tarea);
     setShowTareasModal(true);
   };
-
 
   const abrirModalEdicion = (pedido) => {
     setPedidoEditando(pedido);
@@ -450,6 +346,7 @@ const cargarTareasPendientes = async () => {
     setShowPedidosModal(false);
     setPedidoEditando(null);
   };
+
   return (
     <div style={{ minHeight: "100vh", width: "100%", backgroundColor: "#2d3748", color: "white" }}>
       {/* Navbar */}
@@ -549,31 +446,6 @@ const cargarTareasPendientes = async () => {
             </div>
             <div className="offcanvas-body d-flex flex-column justify-content-between">
               <ul className="navbar-nav flex-grow-1">
-                <li className="nav-item dropdown">
-                  <a className="nav-link dropdown-toggle" href="#" role="button" data-bs-toggle="dropdown">
-                    Filtrar por Sector
-                  </a>
-                  <ul className="dropdown-menu">
-                    <li><button className="dropdown-item" onClick={() => { setFiltroSector(null); cargarPedidos(); }}>Todos</button></li>
-                    {sectores.map(sector => (
-                      <li key={sector.id}>
-                        <button className="dropdown-item" onClick={() => { setFiltroSector(sector.id); cargarPedidos(); }}>
-                          {sector.nombre}
-                        </button>
-                      </li>
-                    ))}
-                  </ul>
-                </li>
-                <li className="nav-item dropdown mt-2">
-                  <a className="nav-link dropdown-toggle" href="#" role="button" data-bs-toggle="dropdown">
-                    Filtrar por Estado
-                  </a>
-                  <ul className="dropdown-menu">
-                    <li><button className="dropdown-item" onClick={() => { setFiltroEstado(null); cargarPedidos(); }}>Todos</button></li>
-                    <li><button className="dropdown-item" onClick={() => { setFiltroEstado('En proceso'); cargarPedidos(); }}>En proceso</button></li>
-                    <li><button className="dropdown-item" onClick={() => { setFiltroEstado('Resuelto'); cargarPedidos(); }}>Resuelto</button></li>
-                  </ul>
-                </li>
                 <li className="nav-item">
                   <Link className="nav-link text-white" to="/pedidos">
                     <i className="bi bi-card-checklist me-2"></i>Pedidos
@@ -627,7 +499,7 @@ const cargarTareasPendientes = async () => {
             sectores={sectores}
             usuario={usuario}
             onGuardarSuccess={() => {
-              cargarPedidos();
+              dispatch(fetchPedidos());
               cerrarModalPedidos();
             }}
           />
@@ -654,7 +526,7 @@ const cargarTareasPendientes = async () => {
               setTareaSeleccionada(null);
             }}
             onTareaGuardada={() => {
-              cargarPedidos();
+              dispatch(fetchPedidos());
               setTareaEditando(null);
               setTareaSeleccionada(null);
             }}

@@ -10,6 +10,8 @@ import dayjs from 'dayjs';
 import utc from 'dayjs/plugin/utc';
 import timezone from 'dayjs/plugin/timezone';
 import 'bootstrap/dist/js/bootstrap.bundle.min';
+import { Provider } from 'react-redux';
+import store from './features/store'
 
 dayjs.extend(utc);
 dayjs.extend(timezone);
@@ -17,8 +19,10 @@ dayjs.tz.setDefault('America/Argentina/Buenos_Aires');
 
 ReactDOM.createRoot(document.getElementById('root')).render(
   //<React.StrictMode>
+    <Provider store={store}>
     <BrowserRouter>
       <App />
     </BrowserRouter>
+    </Provider>
   //</React.StrictMode>
 );
