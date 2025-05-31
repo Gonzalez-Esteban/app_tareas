@@ -37,8 +37,8 @@ export default function Home({ usuario }) {
   const [pedidoSeleccionado, setPedidoSeleccionado] = useState(null);
   const [showPedidosModal, setShowPedidosModal] = useState(false);
   const [showTareasModal, setShowTareasModal] = useState(false);
-  //const [loading, setLoading] = useState(true);
-  //const [error, setError] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
   const [filtroSector, setFiltroSector] = useState(null);
   const [filtroEstado, setFiltroEstado] = useState(null);
   const [tareaSeleccionada, setTareaSeleccionada] = useState(null);
@@ -53,13 +53,11 @@ export default function Home({ usuario }) {
   const tareasRef = useRef(null);
   const accionesRef = useRef(null);
   const tareasContainerRef = useRef(null);
-
   const modalTareasProgramadasRef = useRef();
-
-
   
-const { pedidos, loading: loadingPedidos, error: errorPedidos } = useSelector((state) => state.pedidos);
-const { sectores, loading: loadingSectores, error: errorSectores } = useSelector((state) => state.sectores);
+  //REDUX 
+  const { pedidos, loading: loadingPedidos, error: errorPedidos } = useSelector((state) => state.pedidos);
+  const { sectores, loading: loadingSectores, error: errorSectores } = useSelector((state) => state.sectores);
 
   useEffect(() => {
     const handleClickOutside = (event) => {
@@ -132,19 +130,20 @@ const { sectores, loading: loadingSectores, error: errorSectores } = useSelector
     };
   }, [pedidoSeleccionado, showPedidosModal, showTareasModal, showProgramadasModal]);
 
+  //REDUX
   useEffect(() => {
-  dispatch(fetchPedidos());
-}, [dispatch]);
+    dispatch(fetchPedidos());
+  }, [dispatch]);
   
-  useEffect(() => {
-  dispatch(fetchSectores());
-}, [dispatch]);
+    useEffect(() => {
+    dispatch(fetchSectores());
+  }, [dispatch]);
   
   const inicializar = async () => {
     actualizarHoraYSaludo();
-    //await cargarSectores();
-    //await cargarPedidos();
+    //REDUX
     dispatch(fetchPedidos());
+    dispatch(fetchSectores());
     await cargarProgramadas();
   };
 
@@ -534,7 +533,7 @@ const { sectores, loading: loadingSectores, error: errorSectores } = useSelector
           />
 
           {/* Estados de carga y error */}
-          {loading && (
+          {loadingPedidos && (
             <div className="text-center my-5">
               <div className="spinner-border text-primary" role="status">
                 <span className="visually-hidden">Cargando...</span>
@@ -550,7 +549,7 @@ const { sectores, loading: loadingSectores, error: errorSectores } = useSelector
           )}
 
           {/* Tarjetas de pedidos agrupadas por fecha */}
-          {!loading && !error && (
+          {!loadingPedidos && !errorPedidos && (
             <div className="row mt-3">
               {(() => {
                 const hoy = dayjs().startOf('day');
