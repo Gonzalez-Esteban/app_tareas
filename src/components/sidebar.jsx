@@ -1,31 +1,84 @@
 import React from 'react';
+import { useSelector, useDispatch } from 'react-redux';
 import dayjs from 'dayjs';
 import TarjetaProgramada from './TarjetaProgramada';
+import { setMostrarSoloPendientes } from '../features/programadas/programadasSlice';
+import { fetchTareasProgramadas } from '../features/programadas/programadasThunks'; // Asegúrate de importar tu thunk
+import { useEffect, useRef } from 'react';
 
-const Sidebar = ({ 
-  isSidebarCollapsed, 
+
+const Sidebar = ({
+  isSidebarCollapsed,
   setIsSidebarCollapsed,
-  tareasProgramadas,
-  tareaSeleccionada,
-  setTareaSeleccionada,
+  progSeleccionada,
+  setProgSeleccionada,
   abrirModalProgramadas,
-  cargarProgramadas,
   supabase,
-  mostrarSoloPendientes,
-  setMostrarSoloPendientes,
   loading
 }) => {
+  const dispatch = useDispatch();
+  const tarjetasRef = useRef(null);
+
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (tarjetasRef.current && !tarjetasRef.current.contains(event.target)) {
+        setProgSeleccionada(null);
+      }
+    };
+
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, []);
+
+  useEffect(() => {
+  dispatch(fetchTareasProgramadas());
+}, [dispatch]);
+
+  // 🔁 Estado desde Redux
+
+  const tareasProgramadas = useSelector(state => state.programadas.tareas);
+  const mostrarSoloPendientes = useSelector(state => state.programadas.mostrarSoloPendientes);
+
+  // 📋 Aplicar filtro
   const tareasFiltradas = tareasProgramadas.filter(tarea => {
     if (mostrarSoloPendientes) {
       const ahora = dayjs();
       const fechaVencimiento = dayjs(tarea.fecha_vencimiento);
       const diff = fechaVencimiento.diff(ahora, 'minute');
-      
       return diff > 0 && tarea.estado !== 'Realizada' && tarea.estado !== 'Cancelada';
     }
     return true;
   });
-  
+
+const eliminarProgramada = async (idProg) => {
+  try {
+    const { error } = await supabase
+      .from('programadas')
+      .delete()
+      .eq('id', idProg);
+
+    if (error) throw error;
+
+    dispatch(fetchTareasProgramadas());
+    setProgSeleccionada(null);
+    console.log("Tarea programada eliminada correctamente");
+  } catch (error) {
+    console.error("Error al eliminar tarea programada:", error.message);
+    alert("No se pudo eliminar la tarea. Verifica si hay registros dependientes.");
+  }
+};
+
+
+  // ✅ Cambio de filtro
+  const handleToggleFiltro = () => {
+    dispatch(setMostrarSoloPendientes(!mostrarSoloPendientes));
+    setProgSeleccionada(null);
+  };
+
+
+
   return (
     <div
       className="sidebar-scroll"
@@ -44,7 +97,7 @@ const Sidebar = ({
         scrollbarColor: '#444 #212529'
       }}
     >
-      {/* Cabecera del sidebar */}
+      {/* Cabecera */}
       <div style={{
         padding: '10px',
         position: 'sticky',
@@ -65,31 +118,22 @@ const Sidebar = ({
               Programadas
             </h6>
             <div style={{ display: 'flex', gap: '5px', flexWrap: 'wrap' }}>
-              {tareasFiltradas.filter(t => t.estado === 'Vencida').length > 0 && (
-                <span className="badge bg-danger rounded-pill">
-                  {tareasFiltradas.filter(t => t.estado === 'Vencida').length}
-                </span>
-              )}
-              {tareasFiltradas.filter(t => t.estado === 'Por vencer').length > 0 && (
-                <span className="badge bg-warning rounded-pill">
-                  {tareasFiltradas.filter(t => t.estado === 'Por vencer').length}
-                </span>
-              )}
-              {tareasFiltradas.filter(t => t.estado === 'Pendiente').length > 0 && (
-                <span className="badge bg-primary rounded-pill">
-                  {tareasFiltradas.filter(t => t.estado === 'Pendiente').length}
-                </span>
-              )}
-              {tareasFiltradas.filter(t => t.estado === 'Realizada').length > 0 && (
-                <span className="badge bg-success rounded-pill">
-                  {tareasFiltradas.filter(t => t.estado === 'Realizada').length}
-                </span>
-              )}
-              {tareasFiltradas.filter(t => t.estado === 'Cancelada').length > 0 && (
-                <span className="badge bg-secondary rounded-pill">
-                  {tareasFiltradas.filter(t => t.estado === 'Cancelada').length}
-                </span>
-              )}
+              {['Vencida', 'Por vencer', 'Pendiente', 'Realizada', 'Cancelada'].map(estado => (
+                tareasFiltradas.filter(t => t.estado === estado).length > 0 && (
+                  <span
+                    key={estado}
+                    className={`badge bg-${{
+                      'Vencida': 'danger',
+                      'Por vencer': 'warning',
+                      'Pendiente': 'primary',
+                      'Realizada': 'success',
+                      'Cancelada': 'secondary'
+                    }[estado]} rounded-pill`}
+                  >
+                    {tareasFiltradas.filter(t => t.estado === estado).length}
+                  </span>
+                )
+              ))}
             </div>
           </div>
         )}
@@ -124,10 +168,7 @@ const Sidebar = ({
               type="checkbox"
               id="filtroPendientes"
               checked={!mostrarSoloPendientes}
-              onChange={() => {
-                setMostrarSoloPendientes(!mostrarSoloPendientes);
-                setTareaSeleccionada(null);
-              }}
+              onChange={handleToggleFiltro}
               style={{
                 backgroundColor: !mostrarSoloPendientes ? '#a0aec0' : '#4a5568',
                 borderColor: !mostrarSoloPendientes ? '#a0aec0' : '#4a5568',
@@ -145,34 +186,40 @@ const Sidebar = ({
               {mostrarSoloPendientes ? 'Pendientes' : 'Todos'}
             </label>
           </div>
-          
+
           <div style={{ display: 'flex', gap: '5px' }}>
-            {tareaSeleccionada ? (
+            {progSeleccionada ? (
               <>
                 <button
                   className="btn btn-sm btn-outline-warning"
                   onClick={(e) => {
                     e.stopPropagation();
-                    abrirModalProgramadas(tareaSeleccionada);
+                    abrirModalProgramadas(progSeleccionada);
                   }}
                   style={{ padding: '5px 8px' }}
                 >
                   <i className="bi bi-pencil"></i>
                 </button>
-                <button
-                  className="btn btn-sm btn-outline-danger"
-                  onClick={async (e) => {
-                    e.stopPropagation();
-                    if (window.confirm('¿Eliminar esta tarea programada?')) {
-                      await supabase.from('programadas').delete().eq('id', tareaSeleccionada.id);
-                      cargarProgramadas();
-                      setTareaSeleccionada(null);
-                    }
-                  }}
-                  style={{ padding: '5px 8px' }}
-                >
-                  <i className="bi bi-trash"></i>
-                </button>
+              <button
+                className="btn btn-sm btn-outline-danger"
+                onClick={async (e) => {
+                  e.stopPropagation();
+                   console.log("Botón clickeado");
+
+                  if (!progSeleccionada) {
+                    console.warn("No hay tarea seleccionada");
+                    return;
+                  }
+
+                  if (window.confirm('¿Eliminar esta tarea programada?')) {
+                    console.log("Eliminando tarea programada con id:", progSeleccionada.id_prog);
+                    await eliminarProgramada(porgSeleccionada.id_prog);
+                  }
+                }}
+                style={{ padding: '5px 8px' }}
+              >
+                <i className="bi bi-trash"></i>
+              </button>
               </>
             ) : (
               <button
@@ -187,7 +234,7 @@ const Sidebar = ({
         </div>
       )}
 
-      {/* Contenido del sidebar */}
+      {/* Contenido del Sidebar */}
       <div style={{
         flex: 1,
         overflowY: 'auto',
@@ -205,31 +252,22 @@ const Sidebar = ({
             gap: '4px'
           }}>
             <i className="bi bi-calendar3" style={{ fontSize: '1.2rem' }}></i>
-            {tareasFiltradas.filter(t => t.estado === 'Vencida').length > 0 && (
-              <span className="badge bg-danger rounded-pill">
-                {tareasFiltradas.filter(t => t.estado === 'Vencida').length}
-              </span>
-            )}
-            {tareasFiltradas.filter(t => t.estado === 'Por vencer').length > 0 && (
-              <span className="badge bg-warning rounded-pill">
-                {tareasFiltradas.filter(t => t.estado === 'Por vencer').length}
-              </span>
-            )}
-            {tareasFiltradas.filter(t => t.estado === 'Pendiente').length > 0 && (
-              <span className="badge bg-primary rounded-pill">
-                {tareasFiltradas.filter(t => t.estado === 'Pendiente').length}
-              </span>
-            )}
-            {tareasFiltradas.filter(t => t.estado === 'Realizada').length > 0 && (
-              <span className="badge bg-success rounded-pill">
-                {tareasFiltradas.filter(t => t.estado === 'Realizada').length}
-              </span>
-            )}
-            {tareasFiltradas.filter(t => t.estado === 'Cancelada').length > 0 && (
-              <span className="badge bg-secondary rounded-pill">
-                {tareasFiltradas.filter(t => t.estado === 'Cancelada').length}
-              </span>
-            )}
+            {['Vencida', 'Por vencer', 'Pendiente', 'Realizada', 'Cancelada'].map(estado => (
+              tareasFiltradas.filter(t => t.estado === estado).length > 0 && (
+                <span
+                  key={estado}
+                  className={`badge bg-${{
+                    'Vencida': 'danger',
+                    'Por vencer': 'warning',
+                    'Pendiente': 'primary',
+                    'Realizada': 'success',
+                    'Cancelada': 'secondary'
+                  }[estado]} rounded-pill`}
+                >
+                  {tareasFiltradas.filter(t => t.estado === estado).length}
+                </span>
+              )
+            ))}
           </div>
         ) : (
           <>
@@ -243,29 +281,30 @@ const Sidebar = ({
                 <p>Sin tareas {mostrarSoloPendientes ? 'pendientes' : 'programadas'}</p>
               </div>
             ) : (
-              <div className="d-flex flex-column gap-2">
+              <div className="d-flex flex-column gap-2" ref={tarjetasRef}>
                 {tareasFiltradas.map(tarea => (
                   <TarjetaProgramada
                     key={tarea.registro_id}
                     tarea={tarea}
-                    selected={tareaSeleccionada?.registro_id === tarea.registro_id}
-                    onSelect={(registro_id) =>
-                      setTareaSeleccionada(tareasFiltradas.find(t => t.registro_id === registro_id))
-                    }
+                    selected={progSeleccionada?.registro_id === tarea.registro_id}
+                       onSelect={(registro_id) => {
+                        const progSeleccionada = tareasFiltradas.find(t => t.registro_id === registro_id);
+                        console.log("Tarea seleccionada:", progSeleccionada); 
+                        setProgSeleccionada(progSeleccionada);
+                      }}
                     onComplete={async (registro_id, nuevoEstado) => {
                       const updatedTareas = tareasProgramadas.map(t =>
                         t.registro_id === registro_id ? { ...t, estado: nuevoEstado } : t
                       );
-                      setTareaSeleccionada(null);
-                      
+                      setProgSeleccionada(null);
                       try {
                         const { error } = await supabase
                           .from('registro_programadas')
                           .update({ estado: nuevoEstado })
-                          .eq('id', registro_id);
+                          .eq('id', id);
 
                         if (error) throw error;
-                        cargarProgramadas();
+                        dispatch(fetchTareasProgramadas());
                       } catch (error) {
                         console.error("Error actualizando estado:", error);
                       }
@@ -273,6 +312,7 @@ const Sidebar = ({
                   />
                 ))}
               </div>
+
             )}
           </>
         )}

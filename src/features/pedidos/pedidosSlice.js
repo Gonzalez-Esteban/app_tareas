@@ -1,6 +1,7 @@
 // features/pedidos/pedidosSlice.js
 import { createSlice } from '@reduxjs/toolkit';
 import { fetchPedidos } from './pedidosThunks';
+import { deletePedido, updateEstadoPedido } from './pedidosThunks';
 
 const initialState = {
   pedidos: [],
@@ -30,7 +31,21 @@ const pedidosSlice = createSlice({
       .addCase(fetchPedidos.rejected, (state, action) => {
         state.error = action.payload || 'Error al cargar pedidos';
         state.loading = false;
-      });
+      })
+          // DELETE
+    .addCase(deletePedido.fulfilled, (state, action) => {
+      const id = action.payload;
+      state.pedidos = state.pedidos.filter(p => p.id !== id);
+    })
+
+    // UPDATE ESTADO
+    .addCase(updateEstadoPedido.fulfilled, (state, action) => {
+      const { id, nuevoEstado } = action.payload;
+      const pedido = state.pedidos.find(p => p.id === id);
+      if (pedido) {
+        pedido.estado = nuevoEstado;
+      }
+    });
   },
 });
 

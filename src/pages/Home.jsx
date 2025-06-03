@@ -17,6 +17,9 @@ import Sidebar from '../components/sidebar';
 import { useDispatch, useSelector } from 'react-redux';
 import { fetchPedidos } from '../features/pedidos/pedidosThunks';
 import { fetchSectores } from '../features/sectores/sectoresThunks';
+import { deletePedido, updateEstadoPedido } from '../features/pedidos/pedidosThunks';
+import { fetchTareasProgramadas } from '../features/programadas/programadasThunks';
+
 
 
 dayjs.extend(duration);
@@ -32,7 +35,7 @@ export default function Home({ usuario }) {
   const [horaActual, setHoraActual] = useState("");
   const [saludo, setSaludo] = useState("");
   //const [pedidos, setPedidos] = useState([]);
-  const [tareasProgramadas, setTareasProgramadas] = useState([]);
+ // const [tareasProgramadas, setTareasProgramadas] = useState([]);
   const [pedidoEditando, setPedidoEditando] = useState(null);
   const [pedidoSeleccionado, setPedidoSeleccionado] = useState(null);
   const [showPedidosModal, setShowPedidosModal] = useState(false);
@@ -48,16 +51,20 @@ export default function Home({ usuario }) {
   const [timeRefresh, setTimeRefresh] = useState(Date.now());
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(true);
   const [showProgramadasModal, setShowProgramadasModal] = useState(false);
-  const [mostrarSoloPendientes, setMostrarSoloPendientes] = useState(true);
+  //const [mostrarSoloPendientes, setMostrarSoloPendientes] = useState(true);
   const [localRefresh, setLocalRefresh] = useState(0);
   const tareasRef = useRef(null);
   const accionesRef = useRef(null);
   const tareasContainerRef = useRef(null);
   const modalTareasProgramadasRef = useRef();
+  const [progSeleccionada, setProgSeleccionada] = useState(null);
   
   //REDUX 
   const { pedidos, loading: loadingPedidos, error: errorPedidos } = useSelector((state) => state.pedidos);
   const { sectores, loading: loadingSectores, error: errorSectores } = useSelector((state) => state.sectores);
+  const { porgramadas, loading: loadingProgramadas, error: errorProgramadas } = useSelector(state => state.programadas);
+
+
 
   useEffect(() => {
     const handleClickOutside = (event) => {
@@ -138,13 +145,17 @@ export default function Home({ usuario }) {
     useEffect(() => {
     dispatch(fetchSectores());
   }, [dispatch]);
+    
+  useEffect(() => {
+  dispatch(fetchTareasProgramadas());
+  }, [dispatch]);
   
   const inicializar = async () => {
     actualizarHoraYSaludo();
     //REDUX
     dispatch(fetchPedidos());
     dispatch(fetchSectores());
-    await cargarProgramadas();
+    dispatch(fetchTareasProgramadas());
   };
 
   useEffect(() => {
@@ -159,54 +170,6 @@ export default function Home({ usuario }) {
     return () => clearInterval(interval);
   }, []);
 
-  const cargarProgramadas = async () => {
-    try {
-      const hoyInicio = dayjs().startOf('day').toISOString();
-      const hoyFin = dayjs().endOf('day').toISOString();
-      const { data: { user }, error: authError } = await supabase.auth.getUser();
-      if (authError || !user) throw new Error('No autenticado');
-      // Obtener rango del día actual
-
-      const { data, error } = await supabase
-        .from('registro_programadas')
-        .select(`
-          id,                   
-          estado,
-          fecha_vencimiento,
-          demora,
-          id_prog,              
-          programadas (
-            id,
-            descripcion,
-            creado_por,
-            usuarios_asignados,
-            tipo_recurrencia,
-            activa
-          )
-        `)
-        .eq('programadas.activa', true)
-        .gte('fecha_vencimiento', hoyInicio)
-        .lte('fecha_vencimiento', hoyFin)
-        .order('fecha_vencimiento', { ascending: true });
-
-      if (error) throw error;
-
-      // Filtramos y mapeamos manteniendo el ID del registro
-      const tareasFiltradas = data
-        .filter(item => item.programadas !== null)
-        .map(r => ({
-          ...r,  // Conserva todos los campos del registro
-          ...r.programadas,  // Combina con los datos de programadas
-          registro_id: r.id,  // ID único para usar como key
-        }));
-
-      setTareasProgramadas(tareasFiltradas);
-
-    } catch (error) {
-      console.error('Error al cargar tareas programadas:', error);
-      toast.error('Error al cargar tareas programadas');
-    }
-  };
 
   useEffect(() => {
     const handleResize = () => {
@@ -239,38 +202,14 @@ export default function Home({ usuario }) {
     setHoraActual(`${fechaActual}T${horaStr}`);
   };
 
-
-  const borrarPedido = async (id) => {
-    if (!window.confirm("¿Estás seguro de borrar este pedido?")) return;
-
-    const { error } = await supabase.from("pedidos").delete().eq("id", id);
-    if (error) {
-      console.error("Error al borrar:", error.message);
-      alert("Error al borrar el pedido.");
-    } else {
-      setPedidos((prev) => prev.filter((p) => p.id !== id));
-      if (pedidoSeleccionado?.id === id) {
-        setPedidoSeleccionado(null);
-      }
-    }
+    const borrarPedido = (id) => {
+    dispatch(deletePedido(id));
   };
 
-  const cambiarEstadoPedido = async (pedidoId, nuevoEstado) => {
-    try {
-      const { error } = await supabase
-        .from('pedidos')
-        .update({ estado: nuevoEstado })
-        .eq('id', pedidoId);
-
-      if (error) throw error;
-
-      setPedidos(prev => prev.map(p =>
-        p.id === pedidoId ? { ...p, estado: nuevoEstado } : p
-      ));
-    } catch (error) {
-      console.error('Error cambiando estado:', error);
-    }
+  const cambiarEstadoPedido = (pedidoId, nuevoEstado) => {
+    dispatch(updateEstadoPedido({ id: pedidoId, nuevoEstado }));
   };
+  
 
   const handleLogout = () => {
     localStorage.removeItem("usuario");
@@ -308,6 +247,10 @@ export default function Home({ usuario }) {
     } catch (error) {
       return "Recién creado";
     }
+  };
+
+  const handleTareaGuardada = () => {
+    dispatch(fetchTareasProgramadas());
   };
 
   const abrirModalNuevaTarea = () => {
@@ -466,19 +409,15 @@ export default function Home({ usuario }) {
 
       {/* Sidebar y contenido principal */}
       <div className="d-flex" style={{ paddingTop: "56px" }}>
-        <Sidebar
-          isSidebarCollapsed={isSidebarCollapsed}
-          setIsSidebarCollapsed={setIsSidebarCollapsed}
-          tareasProgramadas={tareasProgramadas}
-          tareaSeleccionada={tareaSeleccionada}
-          setTareaSeleccionada={setTareaSeleccionada}
-          abrirModalProgramadas={abrirModalProgramadas}
-          cargarProgramadas={cargarProgramadas}
-          supabase={supabase}
-          mostrarSoloPendientes={mostrarSoloPendientes}
-          setMostrarSoloPendientes={setMostrarSoloPendientes}
-          loading={loading}
-        />
+      <Sidebar
+  isSidebarCollapsed={isSidebarCollapsed}
+  setIsSidebarCollapsed={setIsSidebarCollapsed}
+  progSeleccionada={progSeleccionada}
+  setProgSeleccionada={setProgSeleccionada}
+  abrirModalProgramadas={abrirModalProgramadas}
+  supabase={supabase}
+  loading={loading}
+/>
 
         {/* Contenido principal */}
         <div style={{
@@ -507,10 +446,7 @@ export default function Home({ usuario }) {
             ref={modalTareasProgramadasRef}
             showModal={showProgramadasModal}
             onClose={() => setShowProgramadasModal(false)}
-            onTareaGuardada={() => {
-              cargarProgramadas();
-              setShowProgramadasModal(false);
-            }}
+            onTareaGuardada={handleTareaGuardada}
             tarea={null}
           />
 

@@ -201,7 +201,7 @@ const ModalTareasProgramadas = forwardRef(({
       await supabase
         .from('programadas')
         .update({ activa: false })
-        .eq('id', tareaExistente.id);
+        .eq('id', tareaExistente.id_prog);
       
       toast.success('Tarea programada desactivada');
       onTareaGuardada();

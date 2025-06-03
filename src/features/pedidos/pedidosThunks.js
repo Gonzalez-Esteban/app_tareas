@@ -18,3 +18,38 @@ export const fetchPedidos = createAsyncThunk(
     }
   }
 );
+
+  // Borrar pedido
+export const deletePedido = createAsyncThunk(
+  'pedidos/deletePedido',
+  async (id, { rejectWithValue }) => {
+    const confirm = window.confirm("¿Estás seguro de borrar este pedido?");
+    if (!confirm) return rejectWithValue('Cancelado por el usuario');
+
+    try {
+      const { error } = await supabase.from("pedidos").delete().eq("id", id);
+      if (error) throw error;
+      return id;
+    } catch (err) {
+      return rejectWithValue(err.message);
+    }
+  }
+);
+
+// Cambiar estado
+export const updateEstadoPedido = createAsyncThunk(
+  'pedidos/updateEstadoPedido',
+  async ({ id, nuevoEstado }, { rejectWithValue }) => {
+    try {
+      const { error } = await supabase
+        .from('pedidos')
+        .update({ estado: nuevoEstado })
+        .eq('id', id);
+
+      if (error) throw error;
+      return { id, nuevoEstado };
+    } catch (err) {
+      return rejectWithValue(err.message);
+    }
+  }
+);
