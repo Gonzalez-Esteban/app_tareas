@@ -12,7 +12,7 @@ import dayjs from 'dayjs';
  *   sector: number,
  *   genero: string,
  *   id_uuid: string,
- *   fases: [
+ *   etapas: [
  *     {
  *       nombre: string,
  *       tareas: [
@@ -39,7 +39,7 @@ export const crearProyectoYRegistro = createAsyncThunk(
         sector,
         genero,
         id_uuid,
-        fases
+        etapas
       } = payload;
 
       // 1. Insertar proyecto
@@ -61,11 +61,11 @@ export const crearProyectoYRegistro = createAsyncThunk(
       const id_proyecto = proyecto.id;
 
       // 2. Insertar tareas en registro_programadas
-      for (let i = 0; i < fases.length; i++) {
-        const faseNumero = i + 1;
-        const fase = fases[i];
+      for (let i = 0; i < etapas.length; i++) {
+        const etapaNumero = i + 1;
+        const etapa = etapas[i];
 
-        for (let tarea of fase.tareas) {
+        for (let tarea of etapa.tareas) {
           const fechaCompleta = `${tarea.fecha}T${tarea.hora}:00`;
 
           // Paso 1: Insertar en programadas (tarea base)
@@ -90,7 +90,7 @@ export const crearProyectoYRegistro = createAsyncThunk(
               id_prog: programada.id,
               fecha_vencimiento: fechaCompleta,
               id_proyecto,
-              fase: faseNumero,
+              etapa: etapaNumero,
               estado: 'Pendiente'
             });
 

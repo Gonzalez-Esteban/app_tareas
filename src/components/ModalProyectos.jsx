@@ -12,7 +12,7 @@ const ModalProyectos = ({ show, onClose, usuario, sectores }) => {
     const [objetivos, setObjetivos] = useState('');
     const [sectorId, setSectorId] = useState('');
     const [fechaVencimiento, setFechaVencimiento] = useState(dayjs().format('YYYY-MM-DD'));
-    const [fases, setFases] = useState([]);
+    const [etapas, setEtapas] = useState([]);
     const modalRef = useRef(null);
     const modalInstance = useRef(null);
     const dispatch = useDispatch();
@@ -55,31 +55,31 @@ const ModalProyectos = ({ show, onClose, usuario, sectores }) => {
         else modalInstance.current.hide();
     }, [show]);
 
-    const agregarFase = () => {
-        setFases(prev => [...prev, { nombre: '', tareas: [] }]);
+    const agregarEtapa = () => {
+        setEtapas(prev => [...prev, { nombre: '', tareas: [] }]);
     };
 
-    const agregarTareaAFase = (faseIndex) => {
-        const nuevasFases = [...fases];
-        nuevasFases[faseIndex].tareas.push({
+    const agregarTareaAEtapa = (etapaIndex) => {
+        const nuevasEtapas = [...etapas];
+        nuevasEtapas[etapaIndex].tareas.push({
         descripcion: '',
         usuarios: [],
         fecha: dayjs().format('YYYY-MM-DD'),
         hora: '12:00'
         });
-        setFases(nuevasFases);
+        setEtapas(nuevasEtapas);
     };
 
-    const actualizarFase = (i, key, value) => {
-        const nuevasFases = [...fases];
-        nuevasFases[i][key] = value;
-        setFases(nuevasFases);
+    const actualizarEtapa = (i, key, value) => {
+        const nuevasEtapas = [...etapas];
+        nuevasEtapas[i][key] = value;
+        setEtapas(nuevasEtapas);
     };
 
-    const actualizarTarea = (faseIndex, tareaIndex, key, value) => {
-        const nuevasFases = [...fases];
-        nuevasFases[faseIndex].tareas[tareaIndex][key] = value;
-        setFases(nuevasFases);
+    const actualizarTarea = (etapaIndex, tareaIndex, key, value) => {
+        const nuevasEtapas = [...etapas];
+        nuevasEtapas[etapaIndex].tareas[tareaIndex][key] = value;
+        setEtapas(nuevasEtapas);
     };
 
     const guardarProyecto = () => {
@@ -89,7 +89,7 @@ const ModalProyectos = ({ show, onClose, usuario, sectores }) => {
             vencimiento: fechaVencimiento,
             sector_id: sectorId,
             id_uuid: usuario?.id,
-            fases
+            etapas
         };
         dispatch(crearProyectoYRegistro(payload));
     };
@@ -119,18 +119,18 @@ const handleClose = () => {
                         <button className="btn-close btn-close-white" onClick={handleClose}></button>
                     </div>
                     <div className="modal-body">
-                        {error && <div className="alert alert-danger">{error}</div>}
-                        {loading && <div className="text-secondary mb-2">Guardando...</div>}
-                        <input className="form-control mb-2" placeholder="Nombre del proyecto" value={nombre} onChange={e => setNombre(e.target.value)} />
-                        <textarea className="form-control mb-2" placeholder="Objetivos" rows={2} value={objetivos} onChange={e => setObjetivos(e.target.value)} />
+                        <label>Nombre</label>
+                        <input className="form-control bg-secondary text-white border-dark mb-2" placeholder="Nombre del proyecto" value={nombre} onChange={e => setNombre(e.target.value)} />
+                        <label>Objetivos</label>
+                        <textarea className="form-control bg-secondary text-white border-dark mb-2" placeholder="Objetivos" rows={2} value={objetivos} onChange={e => setObjetivos(e.target.value)} />
                         <div className="row mb-3">
                             <div className="col-md-6">
                                 <label>Vencimiento</label>
-                                <input type="date" className="form-control" value={fechaVencimiento} onChange={e => setFechaVencimiento(e.target.value)} />
+                                <input type="date" className="form-control bg-secondary text-white border-dark" value={fechaVencimiento} onChange={e => setFechaVencimiento(e.target.value)} />
                             </div>
                             <div className="col-md-6">
                                 <label>Sector</label>
-                                <select className="form-select" value={sectorId} onChange={e => setSectorId(e.target.value)}>
+                                <select className="form-select bg-secondary text-white border-dark" value={sectorId} onChange={e => setSectorId(e.target.value)}>
                                     <option value="">Seleccionar</option>
                                     {sectores.map(s => (
                                         <option key={s.id} value={s.id}>{s.nombre}</option>
@@ -139,19 +139,19 @@ const handleClose = () => {
                             </div>
                         </div>
 
-                        {fases.map((fase, i) => (
+                        {etapas.map((etapa, i) => (
                             <div key={i} className="border p-3 mb-3">
-                                <h6>Fase {i + 1}</h6>
+                                <h6>Etapa {i + 1}</h6>
                                 <input
-                                    className="form-control mb-2"
-                                    placeholder="Nombre de la fase"
-                                    value={fase.nombre}
-                                    onChange={e => actualizarFase(i, 'nombre', e.target.value)}
+                                    className="form-control bg-secondary text-white border-dark mb-2"
+                                    placeholder="Nombre de la etapa"
+                                    value={etapa.nombre}
+                                    onChange={e => actualizarEtapa(i, 'nombre', e.target.value)}
                                 />
-                                {fase.tareas.map((tarea, j) => (
+                                {etapa.tareas.map((tarea, j) => (
                                     <div key={j} className="border p-2 mb-2">
                                         <input
-                                            className="form-control mb-1"
+                                            className="form-control bg-secondary text-white border-dark mb-1"
                                             placeholder="Descripción"
                                             value={tarea.descripcion}
                                             onChange={e => actualizarTarea(i, j, 'descripcion', e.target.value)}
@@ -217,13 +217,13 @@ const handleClose = () => {
                                         {/* Aquí podrías agregar búsqueda de usuarios si lo deseas */}
                                     </div>
                                 ))}
-                                <button className="btn btn-outline-light mt-2" onClick={() => agregarTareaAFase(i)}>
-                                    <i className="bi bi-plus-circle"></i> Agregar tarea
+                                <button className="btn btn-outline-light mt-2" onClick={() => agregarTareaAEtapa(i)}>
+                                    <i className="bi bi-plus-circle"></i> Tarea
                                 </button>
                             </div>
                         ))}
-                        <button className="btn btn-outline-light" onClick={agregarFase}>
-                            <i className="bi bi-plus-circle"></i> Agregar fase
+                        <button className="btn btn-outline-light" onClick={agregarEtapa}>
+                            <i className="bi bi-plus-circle"></i> Etapa
                         </button>
                     </div>
                     <div className="modal-footer">
@@ -232,7 +232,10 @@ const handleClose = () => {
                     </div>
                 </div>
             </div>
+                                    {error && <div className="alert alert-danger">{error}</div>}
+                        {loading && <div className="text-secondary mb-2">Guardando...</div>}
         </div>
+        
     );
 };
 
