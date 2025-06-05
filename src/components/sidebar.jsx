@@ -21,7 +21,13 @@ const Sidebar = ({
 
   useEffect(() => {
     const handleClickOutside = (event) => {
-      if (tarjetasRef.current && !tarjetasRef.current.contains(event.target)) {
+      // Verifica si el click fue en un botón de acción
+      const isActionButton = event.target.closest('.btn-eliminar-programada') ||
+        event.target.closest('.btn-editar-programada');
+
+      if (tarjetasRef.current &&
+        !tarjetasRef.current.contains(event.target) &&
+        !isActionButton) {
         setProgSeleccionada(null);
       }
     };
@@ -32,14 +38,11 @@ const Sidebar = ({
     };
   }, []);
 
-  useEffect(() => {
-  dispatch(fetchTareasProgramadas());
-}, [dispatch]);
-
   // 🔁 Estado desde Redux
 
   const tareasProgramadas = useSelector(state => state.programadas.tareas);
   const mostrarSoloPendientes = useSelector(state => state.programadas.mostrarSoloPendientes);
+
 
   // 📋 Aplicar filtro
   const tareasFiltradas = tareasProgramadas.filter(tarea => {
@@ -52,25 +55,34 @@ const Sidebar = ({
     return true;
   });
 
-const eliminarProgramada = async (idProg) => {
-  try {
-    const { error } = await supabase
-      .from('programadas')
-      .delete()
-      .eq('id', idProg);
+  const eliminarProgramada = async (idProg) => {
+    try {
+      console.log("Intentando eliminar programada con ID:", idProg);
 
-    if (error) throw error;
+      // 1. Primero eliminar registros asociados
+      const { error: errorRegistros } = await supabase
+        .from('registro_programadas')
+        .delete()
+        .eq('id_prog', idProg);
 
-    dispatch(fetchTareasProgramadas());
-    setProgSeleccionada(null);
-    console.log("Tarea programada eliminada correctamente");
-  } catch (error) {
-    console.error("Error al eliminar tarea programada:", error.message);
-    alert("No se pudo eliminar la tarea. Verifica si hay registros dependientes.");
-  }
-};
+      if (errorRegistros) throw errorRegistros;
 
+      // 2. Luego eliminar la programada principal
+      const { error: errorProgramada } = await supabase
+        .from('programadas')
+        .delete()
+        .eq('id', idProg);
 
+      if (errorProgramada) throw errorProgramada;
+
+      dispatch(fetchTareasProgramadas());
+      setProgSeleccionada(null);
+      console.log("Eliminación exitosa");
+    } catch (error) {
+      console.error("Error eliminando:", error);
+      alert("Error al eliminar: " + error.message);
+    }
+  };
   // ✅ Cambio de filtro
   const handleToggleFiltro = () => {
     dispatch(setMostrarSoloPendientes(!mostrarSoloPendientes));
@@ -191,35 +203,34 @@ const eliminarProgramada = async (idProg) => {
             {progSeleccionada ? (
               <>
                 <button
-                  className="btn btn-sm btn-outline-warning"
+                  className="btn btn-sm btn-outline-warning btn-editar-programada"
                   onClick={(e) => {
                     e.stopPropagation();
                     abrirModalProgramadas(progSeleccionada);
                   }}
                   style={{ padding: '5px 8px' }}
+                  title="Editar tarea programada" // Mejora accesibilidad
                 >
                   <i className="bi bi-pencil"></i>
                 </button>
-              <button
-                className="btn btn-sm btn-outline-danger"
-                onClick={async (e) => {
-                  e.stopPropagation();
-                   console.log("Botón clickeado");
+                <button
+                  className="btn btn-sm btn-outline-danger btn-eliminar-programada" // Agrega esta clase
+                  onClick={async (e) => {
+                    e.stopPropagation();
+                    if (!progSeleccionada) {
+                      console.warn("No hay tarea seleccionada");
+                      return;
+                    }
 
-                  if (!progSeleccionada) {
-                    console.warn("No hay tarea seleccionada");
-                    return;
-                  }
-
-                  if (window.confirm('¿Eliminar esta tarea programada?')) {
-                    console.log("Eliminando tarea programada con id:", progSeleccionada.id_prog);
-                    await eliminarProgramada(porgSeleccionada.id_prog);
-                  }
-                }}
-                style={{ padding: '5px 8px' }}
-              >
-                <i className="bi bi-trash"></i>
-              </button>
+                    if (window.confirm('¿Eliminar esta tarea programada?')) {
+                      console.log("Eliminando tarea programada con id:", progSeleccionada.id_prog);
+                      await eliminarProgramada(progSeleccionada.id_prog);
+                    }
+                  }}
+                  style={{ padding: '5px 8px' }}
+                >
+                  <i className="bi bi-trash"></i>
+                </button>
               </>
             ) : (
               <button
@@ -287,24 +298,20 @@ const eliminarProgramada = async (idProg) => {
                     key={tarea.registro_id}
                     tarea={tarea}
                     selected={progSeleccionada?.registro_id === tarea.registro_id}
-                       onSelect={(registro_id) => {
-                        const progSeleccionada = tareasFiltradas.find(t => t.registro_id === registro_id);
-                        console.log("Tarea seleccionada:", progSeleccionada); 
-                        setProgSeleccionada(progSeleccionada);
-                      }}
+                    onSelect={(registro_id) => {
+                      const progSeleccionada = tareasFiltradas.find(t => t.registro_id === registro_id);
+                      setProgSeleccionada(progSeleccionada);
+                    }}
                     onComplete={async (registro_id, nuevoEstado) => {
-                      const updatedTareas = tareasProgramadas.map(t =>
-                        t.registro_id === registro_id ? { ...t, estado: nuevoEstado } : t
-                      );
-                      setProgSeleccionada(null);
                       try {
                         const { error } = await supabase
                           .from('registro_programadas')
                           .update({ estado: nuevoEstado })
-                          .eq('id', id);
+                          .eq('id', registro_id);  // Usar el parámetro registro_id en lugar de id
 
                         if (error) throw error;
                         dispatch(fetchTareasProgramadas());
+                        setProgSeleccionada(null);
                       } catch (error) {
                         console.error("Error actualizando estado:", error);
                       }

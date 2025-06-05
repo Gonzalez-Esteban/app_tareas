@@ -19,6 +19,7 @@ import { fetchPedidos } from '../features/pedidos/pedidosThunks';
 import { fetchSectores } from '../features/sectores/sectoresThunks';
 import { deletePedido, updateEstadoPedido } from '../features/pedidos/pedidosThunks';
 import { fetchTareasProgramadas } from '../features/programadas/programadasThunks';
+import ModalProyectos from '../components/ModalProyectos';
 
 
 
@@ -35,15 +36,13 @@ export default function Home({ usuario }) {
   const [horaActual, setHoraActual] = useState("");
   const [saludo, setSaludo] = useState("");
   //const [pedidos, setPedidos] = useState([]);
- // const [tareasProgramadas, setTareasProgramadas] = useState([]);
+  // const [tareasProgramadas, setTareasProgramadas] = useState([]);
   const [pedidoEditando, setPedidoEditando] = useState(null);
   const [pedidoSeleccionado, setPedidoSeleccionado] = useState(null);
   const [showPedidosModal, setShowPedidosModal] = useState(false);
   const [showTareasModal, setShowTareasModal] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
-  const [filtroSector, setFiltroSector] = useState(null);
-  const [filtroEstado, setFiltroEstado] = useState(null);
   const [tareaSeleccionada, setTareaSeleccionada] = useState(null);
   const [tareaEditando, setTareaEditando] = useState(null);
   const containerRef = useRef(null);
@@ -58,11 +57,13 @@ export default function Home({ usuario }) {
   const tareasContainerRef = useRef(null);
   const modalTareasProgramadasRef = useRef();
   const [progSeleccionada, setProgSeleccionada] = useState(null);
-  
+  const [showModalProyectos, setShowModalProyectos] = useState(false);
+
+
   //REDUX 
   const { pedidos, loading: loadingPedidos, error: errorPedidos } = useSelector((state) => state.pedidos);
   const { sectores, loading: loadingSectores, error: errorSectores } = useSelector((state) => state.sectores);
-  const { porgramadas, loading: loadingProgramadas, error: errorProgramadas } = useSelector(state => state.programadas);
+  const { programadas, loading: loadingProgramadas, error: errorProgramadas } = useSelector(state => state.programadas);
 
 
 
@@ -141,15 +142,15 @@ export default function Home({ usuario }) {
   useEffect(() => {
     dispatch(fetchPedidos());
   }, [dispatch]);
-  
-    useEffect(() => {
+
+  useEffect(() => {
     dispatch(fetchSectores());
   }, [dispatch]);
-    
+
   useEffect(() => {
-  dispatch(fetchTareasProgramadas());
+    dispatch(fetchTareasProgramadas());
   }, [dispatch]);
-  
+
   const inicializar = async () => {
     actualizarHoraYSaludo();
     //REDUX
@@ -202,14 +203,14 @@ export default function Home({ usuario }) {
     setHoraActual(`${fechaActual}T${horaStr}`);
   };
 
-    const borrarPedido = (id) => {
+  const borrarPedido = (id) => {
     dispatch(deletePedido(id));
   };
 
   const cambiarEstadoPedido = (pedidoId, nuevoEstado) => {
     dispatch(updateEstadoPedido({ id: pedidoId, nuevoEstado }));
   };
-  
+
 
   const handleLogout = () => {
     localStorage.removeItem("usuario");
@@ -325,6 +326,7 @@ export default function Home({ usuario }) {
                 </button>
                 <button
                   className="btn btn-outline-secondary me-1"
+                  onClick={() => setShowModalProyectos(true)}
                   style={{ borderWidth: 'px', fontWeight: '600', fontSize: '1rem', color: '#a0aec0' }}
                 >
                   <i className="bi bi-journal-plus"></i> Proyecto
@@ -409,15 +411,15 @@ export default function Home({ usuario }) {
 
       {/* Sidebar y contenido principal */}
       <div className="d-flex" style={{ paddingTop: "56px" }}>
-      <Sidebar
-  isSidebarCollapsed={isSidebarCollapsed}
-  setIsSidebarCollapsed={setIsSidebarCollapsed}
-  progSeleccionada={progSeleccionada}
-  setProgSeleccionada={setProgSeleccionada}
-  abrirModalProgramadas={abrirModalProgramadas}
-  supabase={supabase}
-  loading={loading}
-/>
+        <Sidebar
+          isSidebarCollapsed={isSidebarCollapsed}
+          setIsSidebarCollapsed={setIsSidebarCollapsed}
+          progSeleccionada={progSeleccionada}
+          setProgSeleccionada={setProgSeleccionada}
+          abrirModalProgramadas={abrirModalProgramadas}
+          supabase={supabase}
+          loading={loadingProgramadas}
+        />
 
         {/* Contenido principal */}
         <div style={{
@@ -466,6 +468,13 @@ export default function Home({ usuario }) {
               setTareaSeleccionada(null);
             }}
             cambiarEstadoPedido={cambiarEstadoPedido}
+          />
+
+          <ModalProyectos
+            show={showModalProyectos}
+            onClose={() => setShowModalProyectos(false)}
+            usuario={usuario}
+            sectores={sectores}
           />
 
           {/* Estados de carga y error */}

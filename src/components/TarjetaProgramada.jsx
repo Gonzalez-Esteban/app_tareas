@@ -137,7 +137,7 @@ const TarjetaProgramada = ({
           .update({ proxima_ejecucion: proximaFecha })
           .eq('id', tarea.id_prog);
       }
-
+      // En las funciones marcarComoRealizada y cancelarTarea:
       const { error } = await supabase
         .from('registro_programadas')
         .update({
@@ -146,12 +146,12 @@ const TarjetaProgramada = ({
           finalizo: user.id,
           demora: minutos.toString()
         })
-        .eq('id_prog', tarea.id);
+        .eq('id', tarea.registro_id);
 
       if (error) throw error;
 
-      setEstado('Realizada');
-      onComplete(tarea.id, 'Realizada');
+     setEstado('Realizada');
+      onComplete(tarea.registro_id, 'Realizada'); // Asegúrate de pasar registro_id
 
     } catch (error) {
       console.error('Error al completar tarea:', error);
@@ -185,7 +185,7 @@ const TarjetaProgramada = ({
       if (error) throw error;
 
       setEstado('Cancelada');
-      onComplete(tarea.registro_id, 'Cancelada');
+onComplete(tarea.registro_id, 'Cancelada'); // Asegúrate de pasar registro_id
 
     } catch (error) {
       console.error('Error al cancelar tarea:', error);
