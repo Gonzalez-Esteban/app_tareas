@@ -3,31 +3,6 @@ import { createAsyncThunk } from '@reduxjs/toolkit';
 import { supabase } from '../../supabase/supabaseClient';
 import dayjs from 'dayjs';
 
-/**
- * payload esperado:
- * {
- *   nombre: string,
- *   objetivos: string,
- *   vencimiento: YYYY-MM-DD,
- *   sector: number,
- *   genero: string,
- *   id_uuid: string,
- *   etapas: [
- *     {
- *       nombre: string,
- *       tareas: [
- *         {
- *           descripcion: string,
- *           usuarios: [{ id: string, nombre: string }],
- *           fecha: YYYY-MM-DD,
- *           hora: HH:mm
- *         }
- *       ]
- *     }
- *   ]
- * }
- */
-
 export const crearProyectoYRegistro = createAsyncThunk(
   'proyectos/crearProyectoYRegistro',
   async (payload, { rejectWithValue }) => {
@@ -42,19 +17,22 @@ export const crearProyectoYRegistro = createAsyncThunk(
         etapas
       } = payload;
 
-      // 1. Insertar proyecto
-      const { data: proyecto, error: errorProyecto } = await supabase
-        .from('proyectos')
-        .insert({
-          nombre,
-          objetivos,
-          vencimiento: `${vencimiento}T00:00:00`,
-          sector,
-          genero,
-          id_uuid
-        })
-        .select()
-        .single();
+const nombresEtapas = etapas.map(e => e.nombre || `Etapa ${etapas.indexOf(e) + 1}`);
+
+// 2. Insertar proyecto
+const { data: proyecto, error: errorProyecto } = await supabase
+  .from('proyectos')
+  .insert({
+    nombre,
+    objetivos,
+    vencimiento: `${vencimiento}T00:00:00`,
+    sector,
+    genero,
+    id_uuid,
+    etapas: nombresEtapas // 👈 guarda los nombres como array de texto
+  })
+  .select()
+  .single();
 
       if (errorProyecto) throw errorProyecto;
 
@@ -88,9 +66,11 @@ export const crearProyectoYRegistro = createAsyncThunk(
             .from('registro_programadas')
             .insert({
               id_prog: programada.id,
+              descripcion: tarea.descripcion,
               fecha_vencimiento: fechaCompleta,
               id_proyecto,
               etapa: etapaNumero,
+              creado_por: id_uuid,
               estado: 'Pendiente'
             });
 
@@ -103,3 +83,29 @@ export const crearProyectoYRegistro = createAsyncThunk(
     }
   }
 );
+
+
+/**
+ * payload esperado:
+ * {
+ *   nombre: string,
+ *   objetivos: string,
+ *   vencimiento: YYYY-MM-DD,
+ *   sector: number,
+ *   genero: string,
+ *   id_uuid: string,
+ *   etapas: [
+ *     {
+ *       nombre: string,
+ *       tareas: [
+ *         {
+ *           descripcion: string,
+ *           usuarios: [{ id: string, nombre: string }],
+ *           fecha: YYYY-MM-DD,
+ *           hora: HH:mm
+ *         }
+ *       ]
+ *     }
+ *   ]
+ * }
+ */
