@@ -185,7 +185,7 @@ const ModalProyectos = ({ show, onClose, usuario, sectores }) => {
             </div>
 
             {etapas.map((etapa, i) => (
-              <div key={i} className="border p-3 mb-3">
+              <div key={i} className="border border-light rounded p-2 mb-2">
                 <div className="d-flex justify-content-between mt-2">
                 <h6>Etapa {i + 1}</h6>
                 </div>
@@ -196,14 +196,19 @@ const ModalProyectos = ({ show, onClose, usuario, sectores }) => {
                   </button>
                 </div>
                 {etapa.tareas.map((tarea, j) => (
-                  <div key={j} className="border p-2 mb-2">
+                  <div key={j} className="border border-light rounded p-2 mb-2">
+                     <div className="d-flex justify-content-between align-items-center">
                     <input
                       className={`form-control mb-2 bg-secondary text-white border-dark ${errores[`tarea-${i}-${j}`] ? 'is-invalid' : ''}`}
                       placeholder="Descripción"
                       value={tarea.descripcion}
                       onChange={e => actualizarTarea(i, j, 'descripcion', e.target.value)}
                     />
+                    <button className="btn btn-sm btn-outline-light mb-2 ms-2" onClick={() => eliminarTarea(i, j)}>
+                      <i className="bi bi-trash "></i>
+                    </button>
 
+                  </div>
                     <div className="row mb-2">
                       <div className="col-md-4">
                         <label>Fecha</label>
@@ -243,7 +248,7 @@ const ModalProyectos = ({ show, onClose, usuario, sectores }) => {
 
                         <div className="d-flex flex-wrap gap-2">
                           {(tarea.usuarios || []).map(usuario => (
-                            <span key={usuario.id} className="badge bg-primary d-flex align-items-center">
+                            <span key={usuario.id} className="badge bg-primary d-flex align-items-center mt-2">
                               {usuario.nombre}
                               <button
                                 type="button"
@@ -259,9 +264,7 @@ const ModalProyectos = ({ show, onClose, usuario, sectores }) => {
                         </div>
                       </div>
                     </div>
-                    <button className="btn btn-sm btn-danger" onClick={() => eliminarTarea(i, j)}>
-                      <i className="bi bi-x-circle"></i> Eliminar tarea
-                    </button>
+
                   </div>
                 ))}
 

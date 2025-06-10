@@ -29,16 +29,17 @@ const TarjetaProgramada = ({
   }, [tarea.estado]);
   // Obtener información del creador y usuarios asignados
   useEffect(() => {
+      console.log("Tarea recibida:", tarea);
     const obtenerUsuarios = async () => {
-      if (tarea.creado_por) {
-        const { data: creadorData } = await supabase
-          .from('usuarios')
-          .select('Nombre')
-          .eq('id_uuid', tarea.creado_por)
-          .single();
+ if (tarea.creado_por) {
+  const { data, error } = await supabase
+    .from('usuarios')
+    .select('Nombre')
+    .eq('id_uuid', tarea.creado_por)
+    .single();
 
-        if (creadorData) setCreador(creadorData.Nombre);
-      }
+  if (data) setCreador(data.Nombre); // ✅ corregido
+}
 
       if (tarea.usuarios_asignados?.length > 0) {
         const { data: asignadosData } = await supabase
@@ -150,7 +151,7 @@ const TarjetaProgramada = ({
 
       if (error) throw error;
 
-     setEstado('Realizada');
+      setEstado('Realizada');
       onComplete(tarea.registro_id, 'Realizada'); // Asegúrate de pasar registro_id
 
     } catch (error) {
@@ -185,7 +186,7 @@ const TarjetaProgramada = ({
       if (error) throw error;
 
       setEstado('Cancelada');
-onComplete(tarea.registro_id, 'Cancelada'); // Asegúrate de pasar registro_id
+      onComplete(tarea.registro_id, 'Cancelada'); // Asegúrate de pasar registro_id
 
     } catch (error) {
       console.error('Error al cancelar tarea:', error);
@@ -270,6 +271,16 @@ onComplete(tarea.registro_id, 'Cancelada'); // Asegúrate de pasar registro_id
       }}
     >
       <div className="card-body p-3">
+{tarea.id_proyecto && tarea.proyecto && (
+  <div className="d-flex align-items-start mb-2 text-info">
+    <i className="bi bi-journal me-2 fs-5"></i>
+    <div className="d-flex flex-column">
+      <small className="fw-bold">{tarea.proyecto.nombre}</small>
+      <small>Etapa: {tarea.proyecto.etapas?.[tarea.etapa - 1] || `Etapa ${tarea.etapa}`}</small>
+      <small>Vence: {dayjs(tarea.proyecto.vencimiento).format('DD/MM/YYYY')}</small>
+    </div>
+  </div>
+)}
         <div className="d-flex justify-content-between align-items-start mb-2">
           <div className="d-flex align-items-center">
             <i className="bi bi-calendar-event me-2 text-white"></i>
