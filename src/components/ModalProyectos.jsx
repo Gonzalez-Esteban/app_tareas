@@ -157,7 +157,7 @@ const ModalProyectos = ({ show, onClose, usuario, sectores }) => {
 
   return (
     <div ref={modalRef} className="modal fade" tabIndex="-1">
-      <div className="modal-dialog modal-xl">
+      <div className="modal-dialog modal-lg">
         <div className="modal-content bg-dark text-white">
           <div className="modal-header">
             <h5 className="modal-title">Nuevo Proyecto</h5>

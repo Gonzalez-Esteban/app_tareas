@@ -28,7 +28,7 @@ const Navbar = ({
           {!pedidoSeleccionado ? (
             <>
               <button className="btn btn-outline-secondary me-1" onClick={abrirNuevoPedido}>
-                <i className="bi bi-clipboard-plus me-2"></i> Pedido
+                <i className="bi bi-clipboard-plus"></i> Pedido
               </button>
               <button className="btn btn-outline-secondary me-1" onClick={abrirModalProgramadas}>
                 <i className="bi bi-calendar2-plus"></i> Programada
