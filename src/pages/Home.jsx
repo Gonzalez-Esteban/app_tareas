@@ -19,6 +19,7 @@ import { fetchPedidos } from '../features/pedidos/pedidosThunks';
 import { fetchSectores } from '../features/sectores/sectoresThunks';
 import { deletePedido, updateEstadoPedido } from '../features/pedidos/pedidosThunks';
 import { fetchTareasProgramadas } from '../features/programadas/programadasThunks';
+import Navbar from '../components/NavBar';
 import ModalProyectos from '../components/ModalProyectos';
 
 
@@ -175,9 +176,9 @@ export default function Home({ usuario }) {
   useEffect(() => {
     const handleResize = () => {
       if (window.innerWidth < 768) {
-        setIsSidebarCollapsed(true);
-      } else {
         setIsSidebarCollapsed(false);
+      } else {
+        setIsSidebarCollapsed(true);
       }
     };
 
@@ -292,122 +293,7 @@ export default function Home({ usuario }) {
 
   return (
     <div style={{ minHeight: "100vh", width: "100%", backgroundColor: "#2d3748", color: "white" }}>
-      {/* Navbar */}
-      <nav className="navbar navbar-dark bg-dark fixed-top">
-        <div className="container-fluid d-flex justify-content-between align-items-center" ref={containerRef}
-          onClick={(e) => {
-            if (e.target === e.currentTarget && pedidoSeleccionado) {
-              setPedidoSeleccionado(null);
-              setTareaSeleccionada(null);
-            }
-          }}
-          style={{ borderWidth: '2px', fontWeight: '700', fontSize: '1rem', color: '#a0aec0' }}
-        >
-          <span className="navbar-brand mb-0 h2" style={{ color: '#a0aec0' }}>
-            {saludo}, {usuario?.nombre || "Usuario"}!
-          </span>
 
-          <div className="d-flex align-items-center gap-2">
-            {!pedidoSeleccionado ? (
-              <>
-                <button
-                  className="btn btn-outline-secondary me-1"
-                  onClick={abrirNuevoPedido}
-                  style={{ borderWidth: 'px', fontWeight: '600', fontSize: '1rem', color: '#a0aec0' }}
-                >
-                  <i className="bi bi-clipboard-plus me-2"></i> Pedido
-                </button>
-                <button
-                  className="btn btn-outline-secondary me-1"
-                  onClick={() => abrirModalProgramadas()}
-                  style={{ borderWidth: 'px', fontWeight: '600', fontSize: '1rem', color: '#a0aec0' }}
-                >
-                  <i className="bi bi-calendar2-plus"></i> Programada
-                </button>
-                <button
-                  className="btn btn-outline-secondary me-1"
-                  onClick={() => setShowModalProyectos(true)}
-                  style={{ borderWidth: 'px', fontWeight: '600', fontSize: '1rem', color: '#a0aec0' }}
-                >
-                  <i className="bi bi-journal-plus"></i> Proyecto
-                </button>
-              </>
-            ) : (
-              <>
-                {tareaSeleccionada ? (
-                  <>
-                    <button
-                      className="btn btn-outline-danger me-2"
-                      onClick={() => {
-                        abrirModalEditarTarea(pedidoSeleccionado.tareas.find(t => t.id === tareaSeleccionada));
-                      }}
-                    >
-                      <i className="bi bi-trash me-1"></i> Eliminar
-                    </button>
-                    <button
-                      className="btn btn-outline-warning me-2"
-                      onClick={() => {
-                        abrirModalEditarTarea(pedidoSeleccionado.tareas.find(t => t.id === tareaSeleccionada));
-                      }}
-                    >
-                      <i className="bi bi-pencil me-1"></i> Editar
-                    </button>
-                  </>
-                ) : (
-                  <>
-                    <button
-                      className="btn btn-outline-danger me-2"
-                      onClick={() => borrarPedido(pedidoSeleccionado.id)}
-                    >
-                      <i className="bi bi-trash me-1"></i> Eliminar
-                    </button>
-                    <button
-                      className="btn btn-outline-warning me-2"
-                      onClick={() => abrirModalEdicion(pedidoSeleccionado)}
-                    >
-                      <i className="bi bi-pencil me-1"></i> Editar
-                    </button>
-                    <button
-                      className="btn btn-outline-primary"
-                      onClick={abrirModalNuevaTarea}
-                    >
-                      <i className="bi bi-plus-circle me-1"></i> Agregar Tarea
-                    </button>
-                  </>
-                )}
-              </>
-            )}
-            <button className="navbar-toggler" type="button" data-bs-toggle="offcanvas" data-bs-target="#offcanvasNavbar">
-              <span className="navbar-toggler-icon"></span>
-            </button>
-          </div>
-
-          {/* Offcanvas con filtros */}
-          <div className="offcanvas offcanvas-end text-bg-dark" id="offcanvasNavbar">
-            <div className="offcanvas-header">
-              <h5 className="offcanvas-title">Menú</h5>
-              <button className="btn-close btn-close-white" data-bs-dismiss="offcanvas"></button>
-            </div>
-            <div className="offcanvas-body d-flex flex-column justify-content-between">
-              <ul className="navbar-nav flex-grow-1">
-                <li className="nav-item">
-                  <Link className="nav-link text-white" to="/pedidos">
-                    <i className="bi bi-card-checklist me-2"></i>Pedidos
-                  </Link>
-                </li>
-                <li className="nav-item">
-                  <Link className="nav-link text-white" to="/proyectos">
-                    <i className="bi bi-kanban me-2"></i>Proyectos
-                  </Link>
-                </li>
-              </ul>
-              <button className="btn btn-link text-danger mt-auto" onClick={handleLogout}>
-                <i className="bi bi-box-arrow-right me-2"></i>Cerrar sesión
-              </button>
-            </div>
-          </div>
-        </div>
-      </nav>
 
       {/* Sidebar y contenido principal */}
       <div className="d-flex" style={{ paddingTop: "56px" }}>
@@ -420,17 +306,36 @@ export default function Home({ usuario }) {
           supabase={supabase}
           loading={loadingProgramadas}
         />
-
+        
         {/* Contenido principal */}
         <div style={{
           flexGrow: 1,
           overflowY: 'auto',
-          padding: '20px',
+          padding: '15px',
           marginLeft: isSidebarCollapsed ? '50px' : '390px',
           transition: 'margin-left 0.3s ease'
         }}>
-          <h4 style={{ fontSize: '1.2rem', color: '#a0aec0', marginBottom: '20px' }}>Diarios</h4>
+          
+          <h4 style={{ fontSize: '1.1rem', color: '#a0aec0', marginBottom: '20px' }}><i  className="bi bi-clipboard2-data me-1"></i> Diarios</h4>
 
+          <Navbar
+            saludo={saludo}
+            usuario={usuario}
+            pedidoSeleccionado={pedidoSeleccionado}
+            tareaSeleccionada={tareaSeleccionada}
+            abrirNuevoPedido={abrirNuevoPedido}
+            abrirModalProgramadas={abrirModalProgramadas}
+            abrirModalEditarTarea={abrirModalEditarTarea}
+            borrarPedido={borrarPedido}
+            abrirModalEdicion={abrirModalEdicion}
+            abrirModalNuevaTarea={abrirModalNuevaTarea}
+            setPedidoSeleccionado={setPedidoSeleccionado}
+            setTareaSeleccionada={setTareaSeleccionada}
+            containerRef={containerRef}
+            sectores={sectores}
+            handleLogout={handleLogout}
+            setShowModalProyectos={setShowModalProyectos}
+          />
           {/* Modal de Pedidos */}
           <Pedidos
             showModal={showPedidosModal}
@@ -513,7 +418,7 @@ export default function Home({ usuario }) {
                     {/* HOY */}
                     {pedidosHoy.length > 0 && (
                       <div style={{ marginBottom: '30px' }}>
-                        <h5 className="text" style={{ color: '#a0aec0' }}>Hoy</h5>
+                        <h5 className="text" style={{ color: '#a0aec0', fontWeight: '700', fontSize: '1rem' }}><i className="bi bi-dot"></i>Hoy</h5>
                         <div
                           style={{
                             display: "grid",
@@ -553,7 +458,7 @@ export default function Home({ usuario }) {
                     {/* AYER */}
                     {pedidosAyer.length > 0 && (
                       <div style={{ marginBottom: '30px' }}>
-                        <h5 className="text" style={{ color: '#a0aec0' }}>Ayer</h5>
+                        <h5 className="text" style={{ color: '#a0aec0' }}><i className="bi bi-dot"></i>Ayer</h5>
                         <div
                           style={{
                             display: "grid",
@@ -594,7 +499,7 @@ export default function Home({ usuario }) {
                     {/* MÁS ANTIGUOS */}
                     {pedidosAntiguos.length > 0 && (
                       <div style={{ marginBottom: '30px' }}>
-                        <h5 className="text" style={{ color: '#a0aec0' }}>Más antiguos</h5>
+                        <h5 className="text" style={{ color: '#a0aec0' }}><i className="bi bi-dot"></i>Más antiguos</h5>
                         <div
                           style={{
                             display: "grid",

@@ -11,3 +11,8 @@
     background-color: #444;
     border-radius: 3px;
   }
+  
+  .btn-toggler-grueso {
+    border-width: 3px;
+    border-color: white;
+  }

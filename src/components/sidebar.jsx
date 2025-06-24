@@ -100,7 +100,7 @@ const Sidebar = ({
         overflowY: 'auto',
         transition: 'width 0.3s ease',
         position: 'fixed',
-        top: '56px',
+        top: '50px',
         bottom: 0,
         left: 0,
         zIndex: 1000,
@@ -118,14 +118,14 @@ const Sidebar = ({
         zIndex: 1,
         display: 'flex',
         justifyContent: 'space-between',
-        borderTop: '1px solid #4a5568',
+        borderTop: '1.2px solid #4a5568',
         alignItems: 'center',
-        borderBottom: '1px solid #2d3748',
+        borderBottom: '1.2px solid #4a5568',
         minHeight: '40px'
       }}>
         {!isSidebarCollapsed && (
           <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-            <h6 style={{ color: '#a0aec0', whiteSpace: 'normal', margin: 0 }}>
+            <h6 style={{  fontSize: '1.1rem',color: '#a0aec0', whiteSpace: 'normal', margin: 0 }}>  
               <i className="bi bi-calendar3 me-1"> </i>
               Programadas
             </h6>

@@ -5,38 +5,50 @@ const Navbar = ({
   saludo, usuario, pedidoSeleccionado, tareaSeleccionada,
   abrirNuevoPedido, abrirModalProgramadas, abrirModalEditarTarea,
   borrarPedido, abrirModalEdicion, abrirModalNuevaTarea,
-  setPedidoSeleccionado, setTareaSeleccionada,
+  setPedidoSeleccionado, setTareaSeleccionada, setShowModalProyectos,
   containerRef, sectores, setFiltroSector, setFiltroEstado,
   cargarPedidos, handleLogout
 }) => {
   return (
-    <nav className="navbar navbar-dark bg-dark fixed-top">
-      <div className="container-fluid d-flex justify-content-between align-items-center" ref={containerRef}
-        onClick={(e) => {
-          if (e.target === e.currentTarget && pedidoSeleccionado) {
-            setPedidoSeleccionado(null);
-            setTareaSeleccionada(null);
-          }
-        }}
-        style={{ borderWidth: '2px', fontWeight: '700', fontSize: '1rem', color: '#a0aec0' }}
+      <nav className="navbar navbar-dark bg-dark fixed-top border-bottom border-secondary" style={{ borderBottomWidth: '0.2px' }}>
+        <div className="container-fluid d-flex justify-content-between align-items-center" ref={containerRef}
+          onClick={(e) => {
+            if (e.target === e.currentTarget && pedidoSeleccionado) {
+              setPedidoSeleccionado(null);
+              setTareaSeleccionada(null);
+            }
+          }}
+        style={{ borderWidth: '2px', fontWeight: '500', fontSize: '1rem', color: '#a0aec0' }}
       >
         <span className="navbar-brand mb-0 h2" style={{ color: '#a0aec0' }}>
           {saludo}, {usuario?.nombre || "Usuario"}!
         </span>
 
         <div className="d-flex align-items-center gap-2">
-          {!pedidoSeleccionado ? (
-            <>
-              <button className="btn btn-outline-secondary me-1" onClick={abrirNuevoPedido}>
-                <i className="bi bi-clipboard-plus"></i> Pedido
-              </button>
-              <button className="btn btn-outline-secondary me-1" onClick={abrirModalProgramadas}>
-                <i className="bi bi-calendar2-plus"></i> Programada
-              </button>
-              <button className="btn btn-outline-secondary me-1">
-                <i className="bi bi-journal-plus"></i> Proyecto
-              </button>
-            </>
+            {!pedidoSeleccionado ? (
+              <>
+                <button
+                  className="btn btn-outline-secondary me-1"
+                  onClick={abrirNuevoPedido}
+                  style={{ borderWidth: '1px', fontWeight: '500', fontSize: '0.8rem', color: '#a0aec0' }}
+                >
+                  <i className="bi bi-clipboard-plus"></i> Pedido
+                </button>
+                <button
+                  className="btn btn-outline-secondary me-1"
+                  onClick={() => abrirModalProgramadas()}
+                  style={{ borderWidth: '1px', fontWeight: '500', fontSize: '0.8rem', color: '#a0aec0' }}
+                >
+                  <i className="bi bi-calendar2-plus"></i> Programada
+                </button>
+                <button
+                  className="btn btn-outline-secondary me-1"
+                  onClick={() => setShowModalProyectos(true)}
+                  style={{ borderWidth: '1px', fontWeight: '500', fontSize: '0.8rem', color: '#a0aec0' }}
+                >
+                  <i className="bi bi-journal-plus"></i> Proyecto
+                </button>
+              </>
           ) : (
             <>
               {tareaSeleccionada ? (
@@ -63,7 +75,7 @@ const Navbar = ({
               )}
             </>
           )}
-          <button className="navbar-toggler" type="button" data-bs-toggle="offcanvas" data-bs-target="#offcanvasNavbar">
+          <button className="navbar-toggler border-secondary" style={{ borderWidth: '1px', fontSize: '1rem', color: '#a0aec0' }} type="button" data-bs-toggle="offcanvas" data-bs-target="#offcanvasNavbar" >
             <span className="navbar-toggler-icon"></span>
           </button>
         </div>
@@ -114,3 +126,4 @@ const Navbar = ({
 };
 
 export default Navbar;
+
