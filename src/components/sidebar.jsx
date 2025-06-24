@@ -125,7 +125,7 @@ const Sidebar = ({
       }}>
         {!isSidebarCollapsed && (
           <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-            <h6 style={{  fontSize: '1.1rem',color: '#a0aec0', whiteSpace: 'normal', margin: 0 }}>  
+            <h6 style={{  fontSize: '1rem',color: '#a0aec0', whiteSpace: 'normal', margin: 0 }}>  
               <i className="bi bi-calendar3 me-1"> </i>
               Programadas
             </h6>

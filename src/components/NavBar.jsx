@@ -10,7 +10,7 @@ const Navbar = ({
   cargarPedidos, handleLogout
 }) => {
   return (
-      <nav className="navbar navbar-dark bg-dark fixed-top border-bottom border-secondary" style={{ borderBottomWidth: '0.2px' }}>
+      <nav className="navbar navbar-dark bg-dark fixed-top border-bottom border-secondary">
         <div className="container-fluid d-flex justify-content-between align-items-center" ref={containerRef}
           onClick={(e) => {
             if (e.target === e.currentTarget && pedidoSeleccionado) {
@@ -18,7 +18,7 @@ const Navbar = ({
               setTareaSeleccionada(null);
             }
           }}
-        style={{ borderWidth: '2px', fontWeight: '500', fontSize: '1rem', color: '#a0aec0' }}
+        style={{ fontWeight: '500', fontSize: '1rem', color: '#a0aec0' }}
       >
         <span className="navbar-brand mb-0 h2" style={{ color: '#a0aec0' }}>
           {saludo}, {usuario?.nombre || "Usuario"}!
@@ -53,22 +53,37 @@ const Navbar = ({
             <>
               {tareaSeleccionada ? (
                 <>
-                  <button className="btn btn-outline-danger me-2" onClick={() => abrirModalEditarTarea(pedidoSeleccionado.tareas.find(t => t.id === tareaSeleccionada))}>
+                  <button className="btn btn-outline-danger me-1" 
+                  onClick={() => abrirModalEditarTarea(pedidoSeleccionado.tareas.find(t => t.id === tareaSeleccionada))}
+                  style={{ borderWidth: '1px', fontWeight: '500', fontSize: '0.8rem' }}
+                  >
                     <i className="bi bi-trash me-1"></i> Eliminar
                   </button>
-                  <button className="btn btn-outline-warning me-2" onClick={() => abrirModalEditarTarea(pedidoSeleccionado.tareas.find(t => t.id === tareaSeleccionada))}>
+                  <button className="btn btn-outline-warning me-1" 
+                  onClick={() => abrirModalEditarTarea(pedidoSeleccionado.tareas.find(t => t.id === tareaSeleccionada))}
+                  style={{ borderWidth: '1px', fontWeight: '500', fontSize: '0.8rem' }}
+                  >
                     <i className="bi bi-pencil me-1"></i> Editar
                   </button>
                 </>
               ) : (
                 <>
-                  <button className="btn btn-outline-danger me-2" onClick={() => borrarPedido(pedidoSeleccionado.id)}>
+                  <button className="btn btn-outline-danger me-1" 
+                  onClick={() => borrarPedido(pedidoSeleccionado.id)}
+                  style={{ borderWidth: '1px', fontWeight: '500', fontSize: '0.8rem' }}
+                  >
                     <i className="bi bi-trash me-1"></i> Eliminar
                   </button>
-                  <button className="btn btn-outline-warning me-2" onClick={() => abrirModalEdicion(pedidoSeleccionado)}>
+                  <button className="btn btn-outline-warning me-1" 
+                  onClick={() => abrirModalEdicion(pedidoSeleccionado)}
+                  style={{ borderWidth: '1px', fontWeight: '500', fontSize: '0.8rem' }}
+                  >
                     <i className="bi bi-pencil me-1"></i> Editar
                   </button>
-                  <button className="btn btn-outline-primary" onClick={abrirModalNuevaTarea}>
+                  <button className="btn btn-outline-primary me-1" 
+                  onClick={abrirModalNuevaTarea}
+                  style={{ borderWidth: '1px', fontWeight: '500', fontSize: '0.8rem' }}
+                  >
                     <i className="bi bi-plus-circle me-1"></i> Agregar Tarea
                   </button>
                 </>
