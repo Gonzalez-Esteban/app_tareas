@@ -62,7 +62,7 @@ export default function Home({ usuario }) {
   const [showModalProyectos, setShowModalProyectos] = useState(false);
   const [proyectos, setProyectos] = useState([]);
   const [tareasPorProyecto, setTareasPorProyecto] = useState({});
-
+  const [mostrarProyectos, setMostrarProyectos] = useState(true);
 
   //REDUX 
   const { pedidos, loading: loadingPedidos, error: errorPedidos } = useSelector((state) => state.pedidos);
@@ -83,24 +83,26 @@ export default function Home({ usuario }) {
     };
   }, []);
 
+  
+
   useEffect(() => {
-  const cargarProyectosYtareas = async () => {
-    const { data: proyectosDB } = await supabase.from('proyectos').select('*');
-    const { data: tareasDB } = await supabase.from('registro_programadas').select('*');
+    const cargarProyectosYtareas = async () => {
+      const { data: proyectosDB } = await supabase.from('proyectos').select('*');
+      const { data: tareasDB } = await supabase.from('registro_programadas').select('*');
 
-    const agrupadas = tareasDB.reduce((acc, tarea) => {
-      const id = tarea.id_proyecto;
-      if (!acc[id]) acc[id] = [];
-      acc[id].push(tarea);
-      return acc;
-    }, {});
+      const agrupadas = tareasDB.reduce((acc, tarea) => {
+        const id = tarea.id_proyecto;
+        if (!acc[id]) acc[id] = [];
+        acc[id].push(tarea);
+        return acc;
+      }, {});
 
-    setProyectos(proyectosDB);
-    setTareasPorProyecto(agrupadas);
-  };
+      setProyectos(proyectosDB);
+      setTareasPorProyecto(agrupadas);
+    };
 
-  cargarProyectosYtareas();
-}, []);
+    cargarProyectosYtareas();
+  }, []);
 
   useEffect(() => {
     const handleClickOutside = (event) => {
@@ -313,274 +315,299 @@ export default function Home({ usuario }) {
     setPedidoEditando(null);
   };
 
-return (
-  <div style={{ minHeight: "100vh", width: "100%", backgroundColor: "#2d3748", color: "white" }}>
-<div className="d-flex" style={{ paddingTop: "56px" }}>
-  <Sidebar
-    isSidebarCollapsed={isSidebarCollapsed}
-    setIsSidebarCollapsed={setIsSidebarCollapsed}
-    progSeleccionada={progSeleccionada}
-    setProgSeleccionada={setProgSeleccionada}
-    abrirModalProgramadas={abrirModalProgramadas}
-    supabase={supabase}
-    loading={loadingProgramadas}
-  />
-
-  {/* Contenedor principal: pedidos + proyectos fijos */}
-  <div className="d-flex flex-grow-1">
-
-    
-    {/* 🟦 Columna de pedidos con scroll independiente */}
-    <div style={{
-      flexBasis: '65%',
-      padding: '15px',
-      marginLeft: isSidebarCollapsed ? '50px' : '390px',
-      transition: 'margin-left 0.3s ease'
-    }}>
-          <h6 style={{ fontSize: '1.1rem', color: '#a0aec0', marginBottom: '20px' }}>
-            <i className="bi bi-clipboard2-data me-1"></i> Diarios
-          </h6>
-
-          <Navbar
-            saludo={saludo}
-            usuario={usuario}
-            pedidoSeleccionado={pedidoSeleccionado}
-            tareaSeleccionada={tareaSeleccionada}
-            abrirNuevoPedido={abrirNuevoPedido}
-            abrirModalProgramadas={abrirModalProgramadas}
-            abrirModalEditarTarea={abrirModalEditarTarea}
-            borrarPedido={borrarPedido}
-            abrirModalEdicion={abrirModalEdicion}
-            abrirModalNuevaTarea={abrirModalNuevaTarea}
-            setPedidoSeleccionado={setPedidoSeleccionado}
-            setTareaSeleccionada={setTareaSeleccionada}
-            containerRef={containerRef}
-            sectores={sectores}
-            handleLogout={handleLogout}
-            setShowModalProyectos={setShowModalProyectos}
-          />
-
-          {/* Modales */}
-          <Pedidos
-            showModal={showPedidosModal}
-            pedidoEditando={pedidoEditando}
-            onClose={cerrarModalPedidos}
-            sectores={sectores}
-            usuario={usuario}
-            onGuardarSuccess={() => {
-              dispatch(fetchPedidos());
-              cerrarModalPedidos();
-            }}
-          />
-
-          <ModalTareasProgramadas
-            ref={modalTareasProgramadasRef}
-            showModal={showProgramadasModal}
-            onClose={() => setShowProgramadasModal(false)}
-            onTareaGuardada={handleTareaGuardada}
-            tarea={null}
-          />
-
-          <ModalTareas
-            showModal={showTareasModal}
-            pedido={pedidoSeleccionado}
-            tarea={modoTarea === 'editar' ? tareaEditando : null}
-            onClose={() => {
-              setShowTareasModal(false);
-              setTareaEditando(null);
-              setTareaSeleccionada(null);
-            }}
-            onTareaGuardada={() => {
-              dispatch(fetchPedidos());
-              setTareaEditando(null);
-              setTareaSeleccionada(null);
-            }}
-            cambiarEstadoPedido={cambiarEstadoPedido}
-          />
-
-          <ModalProyectos
-            show={showModalProyectos}
-            onClose={() => setShowModalProyectos(false)}
-            usuario={usuario}
-            sectores={sectores}
-          />
-
-          {/* Estados de carga */}
-          {loadingPedidos && (
-            <div className="text-center my-5">
-              <div className="spinner-border text-primary" role="status">
-                <span className="visually-hidden">Cargando...</span>
-              </div>
-              <p className="text-secondary mt-2">Cargando pedidos...</p>
-            </div>
-          )}
-
-          {error && <div className="alert alert-danger">{error}</div>}
-
-          {/* Tarjetas de pedidos agrupadas por fecha */}
-          {!loadingPedidos && !errorPedidos && (
-            <div className="row mt-3">
-              {(() => {
-                const hoy = dayjs().startOf('day');
-                const ayer = hoy.subtract(1, 'day');
-                const limiteAntiguedad = dayjs().subtract(4, 'day').startOf('day');
-
-                const pedidosHoy = pedidos.filter(p => dayjs(p.created_at).isAfter(hoy));
-                const pedidosAyer = pedidos.filter(p => dayjs(p.created_at).isAfter(ayer) && dayjs(p.created_at).isBefore(hoy));
-                const pedidosAntiguos = pedidos.filter(p => {
-                  const fechaPedido = dayjs(p.created_at);
-                  return fechaPedido.isBefore(ayer) && fechaPedido.isAfter(limiteAntiguedad);
-                });
-
-                return (
-                  <>
-                    {/* HOY */}
-                    {pedidosHoy.length > 0 && (
-                      <div style={{ marginBottom: '30px' }}>
-                        <h5 className="text" style={{ color: '#a0aec0', fontWeight: '700', fontSize: '1.2rem' }}>
-                          <i className="bi bi-dot"></i>Hoy
-                        </h5>
-                        <div style={{
-                          display: "grid",
-                          gap: "16px",
-                          gridTemplateColumns: "repeat(auto-fit, minmax(310px, 360px))",
-                          justifyContent: "flex-start",
-                        }}>
-                          {pedidosHoy.map(pedido => (
-                            <TarjetaPedidos
-                              key={pedido.id}
-                              pedido={pedido}
-                              usuario={usuario}
-                              sectores={sectores}
-                              obtenerNombreSector={obtenerNombreSector}
-                              borrarPedido={borrarPedido}
-                              abrirModalEdicion={abrirModalEdicion}
-                              cambiarEstadoPedido={cambiarEstadoPedido}
-                              timeRefresh={timeRefresh}
-                              calcularTiempoTranscurrido={() => calcularTiempoTranscurrido(pedido.created_at)}
-                              onSelectPedido={(id) => {
-                                setPedidoSeleccionado(id === pedidoSeleccionado?.id ? null : pedidos.find(p => p.id === id));
-                                setTareaSeleccionada(null);
-                              }}
-                              onSelectTarea={(pedidoId, tareaId) => {
-                                setPedidoSeleccionado(pedidos.find(p => p.id === pedidoId));
-                                setTareaSeleccionada(tareaId);
-                              }}
-                              selectedPedidoId={pedidoSeleccionado?.id}
-                              selectedTareaId={tareaSeleccionada}
-                            />
-                          ))}
-                        </div>
-                      </div>
-                    )}
-
-                    {/* AYER */}
-                    {pedidosAyer.length > 0 && (
-                      <div style={{ marginBottom: '30px' }}>
-                        <h5 className="text" style={{ color: '#a0aec0', fontWeight: '700', fontSize: '1.2rem' }}>
-                          <i className="bi bi-dot"></i>Ayer
-                        </h5>
-                        <div style={{
-                          display: "grid",
-                          gap: "12px",
-                          gridTemplateColumns: "repeat(auto-fit, minmax(310px, 360px))",
-                          justifyContent: "flex-start",
-                        }}>
-                          {pedidosAyer.map(pedido => (
-                            <TarjetaPedidos
-                              key={pedido.id}
-                              pedido={pedido}
-                              usuario={usuario}
-                              sectores={sectores}
-                              obtenerNombreSector={obtenerNombreSector}
-                              borrarPedido={borrarPedido}
-                              abrirModalEdicion={abrirModalEdicion}
-                              cambiarEstadoPedido={cambiarEstadoPedido}
-                              timeRefresh={timeRefresh}
-                              calcularTiempoTranscurrido={() => calcularTiempoTranscurrido(pedido.created_at)}
-                              onSelectPedido={(id) => {
-                                setPedidoSeleccionado(id === pedidoSeleccionado?.id ? null : pedidos.find(p => p.id === id));
-                                setTareaSeleccionada(null);
-                              }}
-                              onSelectTarea={(pedidoId, tareaId) => {
-                                setPedidoSeleccionado(pedidos.find(p => p.id === pedidoId));
-                                setTareaSeleccionada(tareaId);
-                              }}
-                              selectedPedidoId={pedidoSeleccionado?.id}
-                              selectedTareaId={tareaSeleccionada}
-                            />
-                          ))}
-                        </div>
-                      </div>
-                    )}
-
-                    {/* MÁS ANTIGUOS */}
-                    {pedidosAntiguos.length > 0 && (
-                      <div style={{ marginBottom: '30px' }}>
-                        <h5 className="text" style={{ color: '#a0aec0', fontWeight: '700', fontSize: '1.2rem' }}>
-                          <i className="bi bi-dot"></i>Más antiguos
-                        </h5>
-                        <div style={{
-                          display: "grid",
-                          gap: "16px",
-                          gridTemplateColumns: "repeat(auto-fit, minmax(310px, 360px))",
-                          justifyContent: "flex-start",
-                        }}>
-                          {pedidosAntiguos.map(pedido => (
-                            <TarjetaPedidos
-                              key={pedido.id}
-                              pedido={pedido}
-                              usuario={usuario}
-                              sectores={sectores}
-                              obtenerNombreSector={obtenerNombreSector}
-                              borrarPedido={borrarPedido}
-                              abrirModalEdicion={abrirModalEdicion}
-                              cambiarEstadoPedido={cambiarEstadoPedido}
-                              timeRefresh={timeRefresh}
-                              calcularTiempoTranscurrido={() => calcularTiempoTranscurrido(pedido.created_at)}
-                              onSelectPedido={(id) => {
-                                setPedidoSeleccionado(id === pedidoSeleccionado?.id ? null : pedidos.find(p => p.id === id));
-                                setTareaSeleccionada(null);
-                              }}
-                              onSelectTarea={(pedidoId, tareaId) => {
-                                setPedidoSeleccionado(pedidos.find(p => p.id === pedidoId));
-                                setTareaSeleccionada(tareaId);
-                              }}
-                              selectedPedidoId={pedidoSeleccionado?.id}
-                              selectedTareaId={tareaSeleccionada}
-                            />
-                          ))}
-                        </div>
-                      </div>
-                    )}
-                  </>
-                );
-              })()}
-            </div>
-          )}
-        </div>
-
-    {/* 🟥 Proyectos - scroll independiente solo cuando necesario */}
-    <div className="border-start proyectos-scroll" style={{
-      flexBasis: '35%',
-      padding: '15px',
-      position: 'sticky',
-      top: '56px',
-      height: 'calc(100vh - 56px)',
-      overflowY: 'auto',
-      alignSelf: 'flex-start'
-    }}>
-      <h6 className="text-info"><i className="bi bi-journal-text me-2"></i>Proyectos</h6>
-      {proyectos.map(proyecto => (
-        <TarjetaProyecto
-          key={proyecto.id}
-          proyecto={proyecto}
-          tareas={tareasPorProyecto[proyecto.id] || []}
+  return (
+    <div style={{ minHeight: "100vh", width: "100%", backgroundColor: "#2d3748", color: "white" }}>
+      <div className="d-flex" style={{ paddingTop: "56px" }}>
+        <Sidebar
+          isSidebarCollapsed={isSidebarCollapsed}
+          setIsSidebarCollapsed={setIsSidebarCollapsed}
+          progSeleccionada={progSeleccionada}
+          setProgSeleccionada={setProgSeleccionada}
+          abrirModalProgramadas={abrirModalProgramadas}
+          supabase={supabase}
+          loading={loadingProgramadas}
         />
-      ))}
-    </div>
+
+        {/* Contenedor principal: pedidos + proyectos fijos */}
+        <div className="d-flex flex-grow-1">
+
+
+          {/* 🟦 Columna de pedidos con scroll independiente */}
+          <div style={{
+            flexGrow: 1,
+            overflowY: 'visible',
+            padding: '15px',
+            marginLeft: isSidebarCollapsed ? '50px' : '390px',
+            transition: 'margin-left 0.3s ease'
+          }}>
+            <h6 style={{ fontSize: '1.1rem', color: '#a0aec0', marginBottom: '20px' }}>
+              <i className="bi bi-clipboard2-data me-1"></i> Diarios
+            </h6>
+
+            <Navbar
+              saludo={saludo}
+              usuario={usuario}
+              pedidoSeleccionado={pedidoSeleccionado}
+              tareaSeleccionada={tareaSeleccionada}
+              abrirNuevoPedido={abrirNuevoPedido}
+              abrirModalProgramadas={abrirModalProgramadas}
+              abrirModalEditarTarea={abrirModalEditarTarea}
+              borrarPedido={borrarPedido}
+              abrirModalEdicion={abrirModalEdicion}
+              abrirModalNuevaTarea={abrirModalNuevaTarea}
+              setPedidoSeleccionado={setPedidoSeleccionado}
+              setTareaSeleccionada={setTareaSeleccionada}
+              containerRef={containerRef}
+              sectores={sectores}
+              handleLogout={handleLogout}
+              setShowModalProyectos={setShowModalProyectos}
+            />
+
+            {/* Modales */}
+            <Pedidos
+              showModal={showPedidosModal}
+              pedidoEditando={pedidoEditando}
+              onClose={cerrarModalPedidos}
+              sectores={sectores}
+              usuario={usuario}
+              onGuardarSuccess={() => {
+                dispatch(fetchPedidos());
+                cerrarModalPedidos();
+              }}
+            />
+
+            <ModalTareasProgramadas
+              ref={modalTareasProgramadasRef}
+              showModal={showProgramadasModal}
+              onClose={() => setShowProgramadasModal(false)}
+              onTareaGuardada={handleTareaGuardada}
+              tarea={null}
+            />
+
+            <ModalTareas
+              showModal={showTareasModal}
+              pedido={pedidoSeleccionado}
+              tarea={modoTarea === 'editar' ? tareaEditando : null}
+              onClose={() => {
+                setShowTareasModal(false);
+                setTareaEditando(null);
+                setTareaSeleccionada(null);
+              }}
+              onTareaGuardada={() => {
+                dispatch(fetchPedidos());
+                setTareaEditando(null);
+                setTareaSeleccionada(null);
+              }}
+              cambiarEstadoPedido={cambiarEstadoPedido}
+            />
+
+            <ModalProyectos
+              show={showModalProyectos}
+              onClose={() => setShowModalProyectos(false)}
+              usuario={usuario}
+              sectores={sectores}
+            />
+
+            {/* Estados de carga */}
+            {loadingPedidos && (
+              <div className="text-center my-5">
+                <div className="spinner-border text-primary" role="status">
+                  <span className="visually-hidden">Cargando...</span>
+                </div>
+                <p className="text-secondary mt-2">Cargando pedidos...</p>
+              </div>
+            )}
+
+            {error && <div className="alert alert-danger">{error}</div>}
+
+            {/* Tarjetas de pedidos agrupadas por fecha */}
+            {!loadingPedidos && !errorPedidos && (
+              <div className="row mt-3">
+                {(() => {
+                  const hoy = dayjs().startOf('day');
+                  const ayer = hoy.subtract(1, 'day');
+                  const limiteAntiguedad = dayjs().subtract(4, 'day').startOf('day');
+
+                  const pedidosHoy = pedidos.filter(p => dayjs(p.created_at).isAfter(hoy));
+                  const pedidosAyer = pedidos.filter(p => dayjs(p.created_at).isAfter(ayer) && dayjs(p.created_at).isBefore(hoy));
+                  const pedidosAntiguos = pedidos.filter(p => {
+                    const fechaPedido = dayjs(p.created_at);
+                    return fechaPedido.isBefore(ayer) && fechaPedido.isAfter(limiteAntiguedad);
+                  });
+
+                  return (
+                    <>
+                      {/* HOY */}
+                      {pedidosHoy.length > 0 && (
+                        <div style={{ marginBottom: '30px' }}>
+                          <h5 className="text" style={{ color: '#a0aec0', fontWeight: '700', fontSize: '1.2rem' }}>
+                            <i className="bi bi-dot"></i>Hoy
+                          </h5>
+                          <div style={{
+                            display: "grid",
+                            gap: "16px",
+                            gridTemplateColumns: "repeat(auto-fit, minmax(310px, 360px))",
+                            justifyContent: "flex-start",
+                          }}>
+                            {pedidosHoy.map(pedido => (
+                              <TarjetaPedidos
+                                key={pedido.id}
+                                pedido={pedido}
+                                usuario={usuario}
+                                sectores={sectores}
+                                obtenerNombreSector={obtenerNombreSector}
+                                borrarPedido={borrarPedido}
+                                abrirModalEdicion={abrirModalEdicion}
+                                cambiarEstadoPedido={cambiarEstadoPedido}
+                                timeRefresh={timeRefresh}
+                                calcularTiempoTranscurrido={() => calcularTiempoTranscurrido(pedido.created_at)}
+                                onSelectPedido={(id) => {
+                                  setPedidoSeleccionado(id === pedidoSeleccionado?.id ? null : pedidos.find(p => p.id === id));
+                                  setTareaSeleccionada(null);
+                                }}
+                                onSelectTarea={(pedidoId, tareaId) => {
+                                  setPedidoSeleccionado(pedidos.find(p => p.id === pedidoId));
+                                  setTareaSeleccionada(tareaId);
+                                }}
+                                selectedPedidoId={pedidoSeleccionado?.id}
+                                selectedTareaId={tareaSeleccionada}
+                              />
+                            ))}
+                          </div>
+                        </div>
+                      )}
+
+                      {/* AYER */}
+                      {pedidosAyer.length > 0 && (
+                        <div style={{ marginBottom: '30px' }}>
+                          <h5 className="text" style={{ color: '#a0aec0', fontWeight: '700', fontSize: '1.2rem' }}>
+                            <i className="bi bi-dot"></i>Ayer
+                          </h5>
+                          <div style={{
+                            display: "grid",
+                            gap: "12px",
+                            gridTemplateColumns: "repeat(auto-fit, minmax(310px, 360px))",
+                            justifyContent: "flex-start",
+                          }}>
+                            {pedidosAyer.map(pedido => (
+                              <TarjetaPedidos
+                                key={pedido.id}
+                                pedido={pedido}
+                                usuario={usuario}
+                                sectores={sectores}
+                                obtenerNombreSector={obtenerNombreSector}
+                                borrarPedido={borrarPedido}
+                                abrirModalEdicion={abrirModalEdicion}
+                                cambiarEstadoPedido={cambiarEstadoPedido}
+                                timeRefresh={timeRefresh}
+                                calcularTiempoTranscurrido={() => calcularTiempoTranscurrido(pedido.created_at)}
+                                onSelectPedido={(id) => {
+                                  setPedidoSeleccionado(id === pedidoSeleccionado?.id ? null : pedidos.find(p => p.id === id));
+                                  setTareaSeleccionada(null);
+                                }}
+                                onSelectTarea={(pedidoId, tareaId) => {
+                                  setPedidoSeleccionado(pedidos.find(p => p.id === pedidoId));
+                                  setTareaSeleccionada(tareaId);
+                                }}
+                                selectedPedidoId={pedidoSeleccionado?.id}
+                                selectedTareaId={tareaSeleccionada}
+                              />
+                            ))}
+                          </div>
+                        </div>
+                      )}
+
+                      {/* MÁS ANTIGUOS */}
+                      {pedidosAntiguos.length > 0 && (
+                        <div style={{ marginBottom: '30px' }}>
+                          <h5 className="text" style={{ color: '#a0aec0', fontWeight: '700', fontSize: '1.2rem' }}>
+                            <i className="bi bi-dot"></i>Más antiguos
+                          </h5>
+                          <div style={{
+                            display: "grid",
+                            gap: "16px",
+                            gridTemplateColumns: "repeat(auto-fit, minmax(310px, 360px))",
+                            justifyContent: "flex-start",
+                          }}>
+                            {pedidosAntiguos.map(pedido => (
+                              <TarjetaPedidos
+                                key={pedido.id}
+                                pedido={pedido}
+                                usuario={usuario}
+                                sectores={sectores}
+                                obtenerNombreSector={obtenerNombreSector}
+                                borrarPedido={borrarPedido}
+                                abrirModalEdicion={abrirModalEdicion}
+                                cambiarEstadoPedido={cambiarEstadoPedido}
+                                timeRefresh={timeRefresh}
+                                calcularTiempoTranscurrido={() => calcularTiempoTranscurrido(pedido.created_at)}
+                                onSelectPedido={(id) => {
+                                  setPedidoSeleccionado(id === pedidoSeleccionado?.id ? null : pedidos.find(p => p.id === id));
+                                  setTareaSeleccionada(null);
+                                }}
+                                onSelectTarea={(pedidoId, tareaId) => {
+                                  setPedidoSeleccionado(pedidos.find(p => p.id === pedidoId));
+                                  setTareaSeleccionada(tareaId);
+                                }}
+                                selectedPedidoId={pedidoSeleccionado?.id}
+                                selectedTareaId={tareaSeleccionada}
+                              />
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                    </>
+                  );
+                })()}
+              </div>
+            )}
+          </div>
+ {/* 🔲 Columna proyectos con línea fija separada */}
+<div style={{
+  flexBasis: '25%',
+  minWidth: '450px',
+  maxWidth: '450px',
+  position: 'relative',
+  zIndex: 1
+}}>
+  {/* Línea divisoria fija */}
+ <div
+  style={{
+    position: 'fixed',
+    left: `calc(100% - 450px)`, // porque la columna derecha tiene ancho fijo
+    top: 0,
+    height: '100vh',
+    width: '1px',
+    backgroundColor: '#666',
+    zIndex: 1000
+  }}
+/>
+
+  {/* Contenido scrollable dentro */}
+  <div className="proyectos-scroll" style={{
+    padding: '15px',
+    position: 'sticky',
+    top: '56px',
+    height: 'calc(100vh - 56px)',
+    overflowY: 'auto',
+    alignSelf: 'flex-start',
+    backgroundColor: 'transparent'
+  }}>
+    <h6 className="text-info">
+      <i className="bi bi-journal-text me-2"></i>Proyectos
+    </h6>
+
+    {proyectos.map(proyecto => (
+      <TarjetaProyecto
+        key={proyecto.id}
+        proyecto={proyecto}
+        tareas={tareasPorProyecto[proyecto.id] || []}
+      />
+    ))}
+  </div>
+</div>
+</div>
       </div>
     </div>
-  </div>
-);
+  );
 }
