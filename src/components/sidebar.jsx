@@ -121,7 +121,8 @@ const Sidebar = ({
         borderTop: '1.2px solid #4a5568',
         alignItems: 'center',
         borderBottom: '1.2px solid #4a5568',
-        minHeight: '40px'
+        minHeight: '53px',
+        height: '53px'
       }}>
         {!isSidebarCollapsed && (
           <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>

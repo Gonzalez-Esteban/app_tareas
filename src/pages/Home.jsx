@@ -197,22 +197,10 @@ export default function Home({ usuario }) {
   }, []);
 
 
-  useEffect(() => {
-    const handleResize = () => {
-      if (window.innerWidth < 768) {
-        setIsSidebarCollapsed(false);
-      } else {
-        setIsSidebarCollapsed(true);
-      }
-    };
-
-    // Ejecutar al montar
-    handleResize();
-
-    // Escuchar cambios de tamaño
-    window.addEventListener('resize', handleResize);
-    return () => window.removeEventListener('resize', handleResize);
-  }, []);
+useEffect(() => {
+  const isSmallScreen = window.innerWidth < 768;
+  setIsSidebarCollapsed(isSmallScreen);
+}, []);
 
   const actualizarHoraYSaludo = () => {
     const ahora = new Date();
@@ -336,13 +324,40 @@ export default function Home({ usuario }) {
           <div style={{
             flexGrow: 1,
             overflowY: 'visible',
-            padding: '15px',
+            padding: '0px',
+            paddingLeft:'15px',
+            paddingRight:'15px',
             marginLeft: isSidebarCollapsed ? '50px' : '390px',
             transition: 'margin-left 0.3s ease'
           }}>
-            <h6 style={{ fontSize: '1.1rem', color: '#a0aec0', marginBottom: '20px' }}>
-              <i className="bi bi-clipboard2-data me-1"></i> Diarios
-            </h6>
+            <div style={{
+              position: 'sticky',
+              top: 50,
+              height: '5vh',
+              backgroundColor: '#2d3748',
+              zIndex: 20,
+              padding: '10px 0',
+              fontSize: '1.1rem',
+              color: '#a0aec0',
+              display: 'flex',
+              alignItems: 'center',
+              borderBottom: '1px solid #555',
+            }}>
+              <i className="bi bi-journal-text me-2 ms-3"></i>Diarios
+            </div>
+
+
+            {/* DIFUMINADO justo debajo del título */}
+            <div style={{
+              position: 'sticky',
+              top: '75px', // ajustá si el título es más alto
+              height: '30px',
+              background: 'linear-gradient(to bottom, #2d3748, transparent)',
+              zIndex: 9,
+              pointerEvents: 'none',
+              marginTop: '0px'
+            }} />
+
 
             <Navbar
               saludo={saludo}
@@ -563,7 +578,7 @@ export default function Home({ usuario }) {
             )}
           </div>
  {/* 🔲 Columna proyectos con línea fija separada */}
-<div style={{
+<div className="d-none d-xl-block" style={{
   flexBasis: '25%',
   minWidth: '450px',
   maxWidth: '450px',
@@ -591,11 +606,37 @@ export default function Home({ usuario }) {
     height: 'calc(100vh - 56px)',
     overflowY: 'auto',
     alignSelf: 'flex-start',
+    paddingTop: '0px',
     backgroundColor: 'transparent'
   }}>
-    <h6 className="text-info">
-      <i className="bi bi-journal-text me-2"></i>Proyectos
-    </h6>
+
+{/* TÍTULO FIJO DE "PROYECTOS" */}
+<div style={{
+  position: 'sticky',
+  top: 0,
+  backgroundColor: '#2d3748',
+  zIndex: 10,
+  padding: '10px 0',
+  fontSize: '1.1rem',
+  color: '#a0aec0',
+  display: 'flex',
+  alignItems: 'center',
+  borderBottom: '1px solid #555',
+}}>
+  <i className="bi bi-journal-text me-2 ms-3"></i>Proyectos
+</div>
+
+    {/* DIFUMINADO justo debajo del título */}
+    <div style={{
+      position: 'sticky',
+      top: '30px', // ajustá si el título es más alto
+      height: '40px',
+      background: 'linear-gradient(to bottom, #2d3748, transparent)',
+      zIndex: 9,
+      pointerEvents: 'none',
+      marginTop: '-20px'
+    }} />
+
 
     {proyectos.map(proyecto => (
       <TarjetaProyecto
@@ -604,6 +645,7 @@ export default function Home({ usuario }) {
         tareas={tareasPorProyecto[proyecto.id] || []}
       />
     ))}
+
   </div>
 </div>
 </div>

@@ -20,7 +20,7 @@ const TarjetaProyecto = ({ proyecto, tareas }) => {
   };
 
   return (
-    <div className="bg-dark text-white p-3 mb-3 rounded border shadow-sm">
+    <div className="bg-transparent text-white p-3 mb-3 rounded border shadow-sm">
       <h6 className="mb-1">
         <i className="bi bi-journal me-2"></i>{proyecto.nombre}
       </h6>
