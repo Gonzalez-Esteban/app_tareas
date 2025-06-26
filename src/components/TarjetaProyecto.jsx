@@ -93,6 +93,10 @@ const TarjetaProyecto = ({
         >
           <i className="bi bi-journal me-2"></i> {proyecto.nombre}
         </h6>
+          
+      <div style={{ fontSize: '0.8rem', color: '#cbd5e0', marginLeft:'4px' }}>
+        Entrega: {dayjs(proyecto.vencimiento).format('DD/MM/YYYY')}
+      </div>
 
         <div className="d-flex gap-2">
           <i className="bi bi-pencil-square text-info" title="Editar proyecto"
@@ -105,9 +109,6 @@ const TarjetaProyecto = ({
       </div>
 
       <p style={{ fontSize: '0.9rem', marginBottom: '4px' }}>{proyecto.objetivos}</p>
-      <div style={{ fontSize: '0.8rem', color: '#cbd5e0' }}>
-        Vencimiento: {dayjs(proyecto.vencimiento).format('DD/MM/YYYY')}
-      </div>
 
       {mostrarEtapas && proyecto.etapas?.map((etapaNombre, i) => {
         const etapaNum = i + 1;
@@ -163,7 +164,7 @@ const TarjetaProyecto = ({
             {expandida && (
               <div className="mt-2">
                 {tareasEtapa.length === 0 ? (
-                  <div className="text-muted ms-2">Sin tareas</div>
+                  <div className="text-primary ms-2">Sin tareas</div>
                 ) : (
                   tareasEtapa.sort((a, b) => new Date(b.created_at) - new Date(a.created_at))
                     .map((tarea, j) => {
