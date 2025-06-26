@@ -305,7 +305,7 @@ useEffect(() => {
 
   return (
     <div style={{ minHeight: "100vh", width: "100%", backgroundColor: "#2d3748", color: "white" }}>
-      <div className="d-flex" style={{ paddingTop: "56px" }}>
+      <div className="d-flex" style={{ paddingTop: "50px" }}>
         <Sidebar
           isSidebarCollapsed={isSidebarCollapsed}
           setIsSidebarCollapsed={setIsSidebarCollapsed}
@@ -325,6 +325,7 @@ useEffect(() => {
             flexGrow: 1,
             overflowY: 'visible',
             padding: '0px',
+            paddingTop: '0px',
             paddingLeft:'15px',
             paddingRight:'15px',
             marginLeft: isSidebarCollapsed ? '50px' : '390px',
@@ -333,15 +334,18 @@ useEffect(() => {
             <div style={{
               position: 'sticky',
               top: 50,
-              height: '5vh',
+              paddingLeft:'0px',
+              paddingRight:'0px',
               backgroundColor: '#2d3748',
-              zIndex: 20,
+              zIndex: 1000,
               padding: '10px 0',
               fontSize: '1.1rem',
               color: '#a0aec0',
               display: 'flex',
+              height:'53px',
               alignItems: 'center',
               borderBottom: '1px solid #555',
+              borderTop: '1px solid #555',
             }}>
               <i className="bi bi-journal-text me-2 ms-3"></i>Diarios
             </div>
@@ -350,8 +354,8 @@ useEffect(() => {
             {/* DIFUMINADO justo debajo del título */}
             <div style={{
               position: 'sticky',
-              top: '75px', // ajustá si el título es más alto
-              height: '30px',
+              top: '100px', // ajustá si el título es más alto
+              height: '40px',
               background: 'linear-gradient(to bottom, #2d3748, transparent)',
               zIndex: 9,
               pointerEvents: 'none',
@@ -536,7 +540,7 @@ useEffect(() => {
                       {pedidosAntiguos.length > 0 && (
                         <div style={{ marginBottom: '30px' }}>
                           <h5 className="text" style={{ color: '#a0aec0', fontWeight: '700', fontSize: '1.2rem' }}>
-                            <i className="bi bi-dot"></i>Más antiguos
+                            <i className="bi bi-dot"></i>Anteriores
                           </h5>
                           <div style={{
                             display: "grid",
@@ -578,13 +582,13 @@ useEffect(() => {
             )}
           </div>
  {/* 🔲 Columna proyectos con línea fija separada */}
-<div className="d-none d-xl-block" style={{
-  flexBasis: '25%',
-  minWidth: '450px',
-  maxWidth: '450px',
-  position: 'relative',
-  zIndex: 1
-}}>
+  <div className="d-none d-xl-block" style={{
+    flexBasis: '25%',
+    minWidth: '450px',
+    maxWidth: '450px',
+    position: 'relative',
+    zIndex: 1
+  }}>
   {/* Línea divisoria fija */}
  <div
   style={{
@@ -638,12 +642,17 @@ useEffect(() => {
     }} />
 
 
-    {proyectos.map(proyecto => (
-      <TarjetaProyecto
-        key={proyecto.id}
-        proyecto={proyecto}
-        tareas={tareasPorProyecto[proyecto.id] || []}
-      />
+    {[...proyectos]
+      .sort((a, b) => new Date(b.created_at) - new Date(a.created_at))
+      .map(proyecto => (
+                <TarjetaProyecto
+  key={proyecto.id}
+  proyecto={proyecto}
+  tareas={tareasPorProyecto[proyecto.id] || []}
+  onSeleccionarProyecto={(proy) => console.log("Proyecto:", proy)}
+  onSeleccionarEtapa={(proy, etapaNum) => console.log("Etapa:", etapaNum, "de", proy.nombre)}
+  onSeleccionarTarea={(proy, etapaNum, tarea) => console.log("Tarea:", tarea, "de etapa", etapaNum)}
+/>
     ))}
 
   </div>
