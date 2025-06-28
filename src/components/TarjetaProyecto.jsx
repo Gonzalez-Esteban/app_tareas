@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import dayjs from 'dayjs';
 
 const TarjetaProyecto = ({
@@ -14,14 +14,32 @@ const TarjetaProyecto = ({
   onEliminarTarea,
   onAgregarTarea,
   onEditarProyecto,
-  onAgregarEtapa
+  onEditarEtapa,
+  onEliminarProyecto,
+  onEliminarEtapa,
+   reiniciar 
 }) => {
   const [mostrarEtapas, setMostrarEtapas] = useState(false);
   const [etapasExpandidas, setEtapasExpandidas] = useState([]);
-  const [alturasLineas, setAlturasLineas] = useState({});
-
-  const curvasRefs = useRef({});
+  const [isMobile, setIsMobile] = useState(false);
+  const containerRef = useRef();
   const etapasRefs = useRef({});
+  const curvasRefs = useRef({});
+  const [lineasInfo, setLineasInfo] = useState({});
+
+  useEffect(() => {
+    const handleResize = () => {
+      setIsMobile(window.innerWidth < 768);
+    };
+    handleResize();
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
+
+  useEffect(() => {
+  setMostrarEtapas(false);
+  setEtapasExpandidas([]);
+}, [reiniciar]);
 
   const tareasPorEtapa = tareas?.reduce((acc, tarea) => {
     const etapaIndex = tarea.etapa || 1;
@@ -30,224 +48,240 @@ const TarjetaProyecto = ({
     return acc;
   }, {}) || {};
 
-  const toggleEtapa = (index) => {
-    setEtapasExpandidas(prev => {
-      const nueva = prev.includes(index)
-        ? prev.filter(i => i !== index)
-        : [...prev, index];
-      return nueva;
-    });
+  const estaSeleccionadoProyecto = proyectoSeleccionado?.id === proyecto.id && !etapaSeleccionada && !tareaSeleccionada;
+
+  const toggleEtapas = (e) => {
+    e.stopPropagation();
+    setMostrarEtapas(prev => !prev);
   };
 
-  const calcularAlturas = () => {
-    const nuevasAlturas = {};
-    etapasExpandidas.forEach((etapaIdx) => {
-      const key = `${proyecto.id}-${etapaIdx + 1}`;
-      const curva = curvasRefs.current[key];
-      const contenedor = etapasRefs.current[key];
-      if (curva && contenedor) {
-        const curvaTop = curva.getBoundingClientRect().top;
-        const contenedorTop = contenedor.getBoundingClientRect().top;
-        nuevasAlturas[key] = curvaTop - contenedorTop + 8;
-      }
-    });
-    setAlturasLineas(nuevasAlturas);
+  const toggleTareas = (etapaNum, e) => {
+    e.stopPropagation();
+    setEtapasExpandidas(prev =>
+      prev.includes(etapaNum) ? prev.filter(n => n !== etapaNum) : [...prev, etapaNum]
+    );
   };
 
   useEffect(() => {
-    if (mostrarEtapas && etapasExpandidas.length > 0) {
-      setTimeout(calcularAlturas, 0);
-    }
-  }, [mostrarEtapas, etapasExpandidas, tareas]);
+  if (reiniciar) {
+    setMostrarEtapas(false);
+    setEtapasExpandidas([]);
+  }
+}, [reiniciar]);
+  useEffect(() => {
+    const nuevasLineas = {};
 
-  const estaSeleccionado = proyectoSeleccionado?.id === proyecto.id;
+    requestAnimationFrame(() => {
+      proyecto.etapas?.forEach((_, i) => {
+        const etapaNum = i + 1;
+        const key = `${proyecto.id}-${etapaNum}`;
+
+        if (!etapasExpandidas.includes(etapaNum)) return;
+
+        const etapaEl = etapasRefs.current[key];
+        const curvaEl = curvasRefs.current[key];
+        const containerEl = containerRef.current;
+
+        if (etapaEl && curvaEl && containerEl) {
+          const etapaBottom = etapaEl.getBoundingClientRect().bottom;
+          const curvaTop = curvaEl.getBoundingClientRect().top;
+          const containerTop = containerEl.getBoundingClientRect().top;
+
+          nuevasLineas[key] = {
+            top: etapaBottom - containerTop,
+            height: curvaTop - etapaBottom
+          };
+        }
+      });
+      setLineasInfo(nuevasLineas);
+    });
+  }, [etapasExpandidas, tareas]);
 
   return (
     <div
+      ref={containerRef}
+      onClick={(e) => {
+        e.stopPropagation();
+        onSeleccionarProyecto?.(proyecto);
+      }}
       style={{
-        backgroundColor: estaSeleccionado ? '#4a5568' : 'transparent',
-        color: '#e2e8f0',
         padding: '16px',
         borderRadius: '8px',
         marginBottom: '16px',
-        border: '1px solid #4a5568',
-        boxShadow: '0 2px 4px rgba(0,0,0,0.2)'
-      }}>
-      <div className="d-flex justify-content-between align-items-center">
-        <h6
-          className="fw-bold mb-2 d-flex align-items-center"
-          style={{ cursor: 'pointer', color: '#ffffff' }}
-          onClick={() => {
-            const mostrar = !mostrarEtapas;
-            setMostrarEtapas(mostrar);
-            onSeleccionarProyecto?.(proyecto);
-            if (mostrar) {
-              const todas = proyecto.etapas?.map((_, i) => i) || [];
-              setEtapasExpandidas(todas);
-              setTimeout(calcularAlturas, 0);
-            } else {
-              setEtapasExpandidas([]);
-              setAlturasLineas({});
-            }
-          }}
-        >
+        border: `2px solid ${estaSeleccionadoProyecto ? '#63b3ed' : '#4a5568'}`,
+        backgroundColor: 'transparent',
+        boxShadow: '0 2px 4px rgba(0,0,0,0.2)',
+        cursor: 'pointer',
+        position: 'relative'
+      }}
+    >
+      <div style={{ position: 'relative', paddingRight: '66px' }}>
+        <h6 className="fw-bold mb-2 d-flex align-items-center text-white">
           <i className="bi bi-journal me-2"></i> {proyecto.nombre}
         </h6>
-          
-      <div style={{ fontSize: '0.8rem', color: '#cbd5e0', marginLeft:'4px' }}>
-        Entrega: {dayjs(proyecto.vencimiento).format('DD/MM/YYYY')}
-      </div>
 
-        <div className="d-flex gap-2">
-          <i className="bi bi-pencil-square text-info" title="Editar proyecto"
-             style={{ cursor: 'pointer' }}
-             onClick={() => onEditarProyecto?.(proyecto)}></i>
-          <i className="bi bi-plus-circle text-success" title="Agregar etapa"
-             style={{ cursor: 'pointer' }}
-             onClick={() => onAgregarEtapa?.(proyecto)}></i>
-        </div>
-      </div>
 
-      <p style={{ fontSize: '0.9rem', marginBottom: '4px' }}>{proyecto.objetivos}</p>
+        {estaSeleccionadoProyecto && (
+          <div style={{
+            position: 'absolute',
+            top: '-8px',
+            right: '8px',
+            display: 'flex',
+            gap: '5px'
+          }}>
+            <i className="bi bi-trash text-danger" title="Eliminar proyecto"
+              onClick={(e) => {
+                e.stopPropagation();
+                onEliminarProyecto?.(proyecto);
+              }} style={{ cursor: 'pointer' }}></i>
+            <i className="bi bi-pencil-square text-info" title="Editar proyecto"
+              onClick={(e) => {
+                e.stopPropagation();
+                onEditarProyecto?.(proyecto, 'proyecto');
+              }} style={{ cursor: 'pointer' }}></i>
+            <i className="bi bi-plus-circle text-success" title="Agregar etapa"
+              onClick={(e) => {
+                e.stopPropagation();
+                onAgregarTarea?.(proyecto);
+              }} style={{ cursor: 'pointer' }}></i>
+
+            <i className={`bi bi-chevron-${mostrarEtapas ? 'up' : 'down'} text-light`} onClick={toggleEtapas} style={{ cursor: 'pointer' }}></i>
+          </div>
+        )}
+      </div>
 
       {mostrarEtapas && proyecto.etapas?.map((etapaNombre, i) => {
         const etapaNum = i + 1;
         const tareasEtapa = tareasPorEtapa[etapaNum] || [];
-        const expandida = etapasExpandidas.includes(i);
+        const etapaActiva = etapaSeleccionada?.numero === etapaNum && proyectoSeleccionado?.id === proyecto.id && (!tareaSeleccionada || tareaSeleccionada.etapa !== etapaNum);
+        const expandida = etapasExpandidas.includes(etapaNum);
         const key = `${proyecto.id}-${etapaNum}`;
-        const alturaLinea = alturasLineas[key] ?? 0;
-        const etapaActiva = etapaSeleccionada?.numero === etapaNum && proyectoSeleccionado?.id === proyecto.id;
+        const linea = lineasInfo[key];
 
         return (
-          <div
-            key={i}
-            style={{ position: 'relative', paddingLeft: '25px', marginBottom: '24px' }}
-            ref={(el) => etapasRefs.current[key] = el}
-          >
-            {expandida && tareasEtapa.length > 0 && (
-              <div style={{
-                position: 'absolute',
-                left: '31px',
-                top: '0',
-                height: `${alturaLinea}px`,
-                width: '2px',
-                backgroundColor: '#4a5568',
-                borderRadius: '1px',
-                zIndex: 0
-              }} />
+          <div key={i} className="mt-2 ms-2" style={{ position: 'relative' }}>
+            {expandida && linea && (
+              <div
+                style={{
+                  position: 'absolute',
+                  left: '4px',
+                  top: `${linea.top - 45}px`,
+                  height: `${linea.height}px`,
+                  width: '2px',
+                  backgroundColor: '#4a5568',
+                  zIndex: 0
+                }}
+              ></div>
             )}
 
             <div
-              onClick={() => {
-                toggleEtapa(i);
+              className="d-flex align-items-center"
+              onClick={(e) => {
+                e.stopPropagation();
                 onSeleccionarEtapa?.(proyecto, etapaNum);
               }}
+              ref={(el) => (etapasRefs.current[key] = el)}
               style={{
-                backgroundColor: etapaActiva ? '#2b6cb0' : '#4a5568',
-                color: '#f7fafc',
-                padding: '4px 12px',
+                position: 'relative',
+                border: `2px solid ${etapaActiva ? '#63b3ed' : '#4a5568'}`,
+                padding: '8px 12px',
+                paddingRight: '64px',
                 borderRadius: '4px',
                 cursor: 'pointer',
-                display: 'flex',
-                justifyContent: 'space-between',
-                alignItems: 'center'
+                color: '#f7fafc',
+                backgroundColor: 'transparent',
+                minHeight: '40px'
               }}
             >
-              {etapaNombre}
-              <i className="bi bi-plus-circle ms-2 text-light" title="Agregar tarea"
-                 onClick={(e) => {
-                   e.stopPropagation();
-                   onAgregarTarea?.(proyecto, etapaNum);
-                 }}></i>
+              <span>{etapaNombre}</span>
+              {etapaActiva && (
+                <div style={{
+                  position: 'absolute',
+                  top: '8px',
+                  right: '8px',
+                  display: 'flex',
+                  gap: '8px'
+                }}>
+                  <i className="bi bi-trash text-danger" title="Eliminar etapa"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onEliminarEtapa?.(proyecto, etapaNum);
+                    }}></i>
+                  <i className="bi bi-pencil-square text-info" title="Editar etapa"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onEditarEtapa?.(proyecto, etapaNum);
+                    }}></i>
+                  <i className="bi bi-plus-circle text-light" title="Agregar tarea"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onAgregarTarea?.(proyecto, etapaNum);
+                    }}></i>
+
+                  <i className={`bi bi-chevron-${expandida ? 'up' : 'down'} text-light`} onClick={(e) => toggleTareas(etapaNum, e)} style={{ cursor: 'pointer' }}></i>
+                </div>
+              )}
             </div>
 
-            {expandida && (
-              <div className="mt-2">
-                {tareasEtapa.length === 0 ? (
-                  <div className="text-primary ms-2">Sin tareas</div>
-                ) : (
-                  tareasEtapa.sort((a, b) => new Date(b.created_at) - new Date(a.created_at))
-                    .map((tarea, j) => {
-                      const esUltima = j === tareasEtapa.length - 1;
-                      const tareaActiva = tareaSeleccionada?.id === tarea.id;
-                      return (
-                        <div
-                          key={j}
-                          style={{
-                            position: 'relative',
-                            paddingLeft: '25px',
-                            marginTop: '10px'
-                          }}
-                        >
-                          <div
-                            ref={esUltima ? (el) => curvasRefs.current[key] = el : null}
-                            style={{
-                              position: 'absolute',
-                              left: '6px',
-                              top: '0.65rem',
-                              width: '20px',
-                              height: '20px',
-                              borderLeft: '2px solid #4a5568',
-                              borderBottom: '2px solid #4a5568',
-                              borderBottomLeftRadius: '10px'
-                            }}
-                          />
+            {expandida && tareasEtapa.map((tarea, j) => {
+              const tareaActiva = tareaSeleccionada?.id === tarea.id;
+              return (
+                <div
+                  key={j}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onSeleccionarTarea?.(proyecto, etapaNum, tarea);
+                  }}
+                  style={{
+                    border: `2px solid ${tareaActiva ? '#63b3ed' : '#4a5568'}`,
+                    backgroundColor: 'transparent',
+                    padding: '8px 12px',
+                    paddingRight: '64px',
+                    borderRadius: '4px',
+                    marginTop: '8px',
+                    cursor: 'pointer',
+                    marginLeft: '24px',
+                    position: 'relative',
+                    minHeight: '48px'
+                  }}
+                >
+                  <div
+                    ref={(el) => (curvasRefs.current[key] = el)}
+                    style={{
+                      position: 'absolute',
+                      left: '-22px',
+                      top: '0.65rem',
+                      width: '20px',
+                      height: '20px',
+                      borderLeft: '2px solid #4a5568',
+                      borderBottom: '2px solid #4a5568',
+                      borderBottomLeftRadius: '8px'
+                    }}
+                  ></div>
 
-                          <div
-                            style={{
-                              backgroundColor: tareaActiva ? '#2b6cb0' : '#2d3748',
-                              border: '1px solid #4a5568',
-                              borderRadius: '6px',
-                              padding: '10px',
-                              display: 'flex',
-                              justifyContent: 'space-between',
-                              alignItems: 'flex-start',
-                              cursor: 'pointer'
-                            }}
-                            onClick={() => onSeleccionarTarea?.(proyecto, etapaNum, tarea)}
-                          >
-                            <div>
-                              <div style={{ fontWeight: '500', color: '#e2e8f0' }}>
-                                {tarea.descripcion}
-                              </div>
-                              <div className="text-secondary small">
-                                🕒 {dayjs(tarea.fecha_vencimiento).format('DD/MM/YYYY HH:mm')} | Estado:
-                                <span className={`badge bg-${
-                                  tarea.estado === 'Pendiente' ? 'warning' :
-                                  tarea.estado === 'Realizada' ? 'success' : 'secondary'
-                                } ms-2`}>
-                                  {tarea.estado}
-                                </span>
-                              </div>
-                            </div>
+                  {tareaActiva && (
+                    <div style={{
+                      position: 'absolute',
+                      top: '8px',
+                      right: '8px',
+                      display: 'flex',
+                      gap: '8px'
+                    }}>
+                      <i className="bi bi-trash text-danger" onClick={(e) => {
+                        e.stopPropagation();
+                        onEliminarTarea?.(tarea);
+                      }}></i>
+                      <i className="bi bi-pencil-square text-info" onClick={(e) => {
+                        e.stopPropagation();
+                        onEditarTarea?.(tarea);
+                      }}></i>
 
-                            <div style={{ display: 'flex', gap: '8px', marginLeft: '10px' }}>
-                              <i
-                                className="bi bi-pencil-square text-info"
-                                title="Editar"
-                                style={{ cursor: 'pointer' }}
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  onEditarTarea?.(proyecto, etapaNum, tarea);
-                                }}
-                              ></i>
-                              <i
-                                className="bi bi-trash text-danger"
-                                title="Eliminar"
-                                style={{ cursor: 'pointer' }}
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  onEliminarTarea?.(proyecto, etapaNum, tarea);
-                                }}
-                              ></i>
-                            </div>
-                          </div>
-                        </div>
-                      );
-                    })
-                )}
-              </div>
-            )}
+                    </div>
+                  )}
+                  <div>{tarea.descripcion}</div>
+                </div>
+              );
+            })}
           </div>
         );
       })}

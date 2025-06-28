@@ -63,6 +63,11 @@ export default function Home({ usuario }) {
   const [proyectos, setProyectos] = useState([]);
   const [tareasPorProyecto, setTareasPorProyecto] = useState({});
   const [mostrarProyectos, setMostrarProyectos] = useState(true);
+  const [proyectoEditando, setProyectoEditando] = useState(null);
+  const [proyectoSeleccionado, setProyectoSeleccionado] = useState(null);
+  const [etapaSeleccionada, setEtapaSeleccionada] = useState(null);
+const [reiniciar, setReiniciar] = useState(false);
+
 
   //REDUX 
   const { pedidos, loading: loadingPedidos, error: errorPedidos } = useSelector((state) => state.pedidos);
@@ -83,7 +88,7 @@ export default function Home({ usuario }) {
     };
   }, []);
 
-  
+
 
   useEffect(() => {
     const cargarProyectosYtareas = async () => {
@@ -197,10 +202,10 @@ export default function Home({ usuario }) {
   }, []);
 
 
-useEffect(() => {
-  const isSmallScreen = window.innerWidth < 768;
-  setIsSidebarCollapsed(isSmallScreen);
-}, []);
+  useEffect(() => {
+    const isSmallScreen = window.innerWidth < 768;
+    setIsSidebarCollapsed(isSmallScreen);
+  }, []);
 
   const actualizarHoraYSaludo = () => {
     const ahora = new Date();
@@ -234,7 +239,18 @@ useEffect(() => {
     const sector = sectores.find((s) => s.id === sector_id);
     return sector?.nombre || "Sin sector";
   };
+  const abrirModalEditarProyecto = (proyecto, tipo) => {
+    setShowModalProyectos(true);
+    setProyectoEditando({ ...proyecto, tipo }); // tipo = 'proyecto' o 'etapa'
+  };
 
+  const abrirModalTareaProgramada = (proyecto, etapa) => {
+    modalTareasProgramadasRef.current?.abrirProgramada({
+      id_proyecto: proyecto.id,
+      etapa,
+    });
+    setShowProgramadasModal(true);
+  };
   const calcularTiempoTranscurrido = (fechaCreacion) => {
     if (!fechaCreacion) return "No disponible";
 
@@ -303,7 +319,9 @@ useEffect(() => {
     setPedidoEditando(null);
   };
 
+
   return (
+    
     <div style={{ minHeight: "100vh", width: "100%", backgroundColor: "#2d3748", color: "white" }}>
       <div className="d-flex" style={{ paddingTop: "50px" }}>
         <Sidebar
@@ -326,23 +344,23 @@ useEffect(() => {
             overflowY: 'visible',
             padding: '0px',
             paddingTop: '0px',
-            paddingLeft:'15px',
-            paddingRight:'15px',
+            paddingLeft: '15px',
+            paddingRight: '15px',
             marginLeft: isSidebarCollapsed ? '50px' : '390px',
             transition: 'margin-left 0.3s ease'
           }}>
             <div style={{
               position: 'sticky',
               top: 50,
-              paddingLeft:'0px',
-              paddingRight:'0px',
+              paddingLeft: '0px',
+              paddingRight: '0px',
               backgroundColor: '#2d3748',
               zIndex: 1000,
               padding: '10px 0',
               fontSize: '1.1rem',
               color: '#a0aec0',
               display: 'flex',
-              height:'53px',
+              height: '53px',
               alignItems: 'center',
               borderBottom: '1px solid #555',
               borderTop: '1px solid #555',
@@ -425,8 +443,8 @@ useEffect(() => {
               onClose={() => setShowModalProyectos(false)}
               usuario={usuario}
               sectores={sectores}
+              proyectoEditando={proyectoEditando}
             />
-
             {/* Estados de carga */}
             {loadingPedidos && (
               <div className="text-center my-5">
@@ -456,7 +474,9 @@ useEffect(() => {
 
                   return (
                     <>
+                    
                       {/* HOY */}
+                      
                       {pedidosHoy.length > 0 && (
                         <div style={{ marginBottom: '30px' }}>
                           <h5 className="text" style={{ color: '#a0aec0', fontWeight: '700', fontSize: '1.2rem' }}>
@@ -581,83 +601,146 @@ useEffect(() => {
               </div>
             )}
           </div>
- {/* 🔲 Columna proyectos con línea fija separada */}
-  <div className="d-none d-xl-block" style={{
-    flexBasis: '25%',
-    minWidth: '450px',
-    maxWidth: '450px',
-    position: 'relative',
-    zIndex: 1
-  }}>
-  {/* Línea divisoria fija */}
- <div
-  style={{
-    position: 'fixed',
-    left: `calc(100% - 450px)`, // porque la columna derecha tiene ancho fijo
-    top: 0,
-    height: '100vh',
-    width: '1px',
-    backgroundColor: '#666',
-    zIndex: 1000
+          
+          {/* 🔲 Columna proyectos con línea fija separada */}
+          <div className="d-none d-xl-block" style={{
+            flexBasis: '25%',
+            minWidth: '450px',
+            maxWidth: '450px',
+            position: 'relative',
+            zIndex: 1
+          }}>
+            {/* Línea divisoria fija */}
+            <div
+              style={{
+                position: 'fixed',
+                left: `calc(100% - 450px)`, // porque la columna derecha tiene ancho fijo
+                top: 0,
+                height: '100vh',
+                width: '1px',
+                backgroundColor: '#666',
+                zIndex: 1000
+              }}
+            />
+
+            {/* Contenido scrollable dentro */}
+            <div className="proyectos-scroll" style={{
+              padding: '15px',
+              position: 'sticky',
+              top: '56px',
+              height: 'calc(100vh - 56px)',
+              overflowY: 'auto',
+              alignSelf: 'flex-start',
+              paddingTop: '0px',
+              backgroundColor: 'transparent'
+            }}>
+
+              {/* TÍTULO FIJO DE "PROYECTOS" */}
+              <div style={{
+                position: 'sticky',
+                top: 0,
+                backgroundColor: '#2d3748',
+                zIndex: 10,
+                padding: '10px 0',
+                fontSize: '1.1rem',
+                color: '#a0aec0',
+                display: 'flex',
+                alignItems: 'center',
+                borderBottom: '1px solid #555',
+              }}>
+                <i className="bi bi-journal-text me-2 ms-3"></i>Proyectos
+              </div>
+
+              {/* DIFUMINADO justo debajo del título */}
+              <div style={{
+                position: 'sticky',
+                top: '30px', // ajustá si el título es más alto
+                height: '40px',
+                background: 'linear-gradient(to bottom, #2d3748, transparent)',
+                zIndex: 9,
+                pointerEvents: 'none',
+                marginTop: '-20px'
+              }} />
+      <div
+  onClick={() => {
+    setProyectoSeleccionado(null);
+    setEtapaSeleccionada(null);
+    setTareaSeleccionada(null);
+    setPedidoSeleccionado(null);
+    setReiniciar(prev => !prev); // Trigger para replegar etapas y tareas
   }}
-/>
+  style={{ width: '100%', height: '100%' }}
+>  
 
-  {/* Contenido scrollable dentro */}
-  <div className="proyectos-scroll" style={{
-    padding: '15px',
-    position: 'sticky',
-    top: '56px',
-    height: 'calc(100vh - 56px)',
-    overflowY: 'auto',
-    alignSelf: 'flex-start',
-    paddingTop: '0px',
-    backgroundColor: 'transparent'
-  }}>
+  {mostrarProyectos && (
+    <div className="mt-4">
+      {[...proyectos]
+        .sort((a, b) => new Date(b.created_at) - new Date(a.created_at))
+        .map((p) => (
+          <TarjetaProyecto
+            key={p.id}
+            proyecto={p}
+            tareas={tareasPorProyecto[p.id] || []}
+            proyectoSeleccionado={proyectoSeleccionado}
+            etapaSeleccionada={etapaSeleccionada}
+            tareaSeleccionada={tareaSeleccionada}
+            reiniciar={reiniciar}
+            onSeleccionarProyecto={(p) => {
+              setProyectoSeleccionado(p);
+              setEtapaSeleccionada(null);
+              setTareaSeleccionada(null);
+              setPedidoSeleccionado(null);
+            }}
+            onSeleccionarEtapa={(p, etapaNum) => {
+              setProyectoSeleccionado(p);
+              setEtapaSeleccionada({ numero: etapaNum });
+              setTareaSeleccionada(null);
+              setPedidoSeleccionado(null);
+            }}
+            onSeleccionarTarea={(p, etapaNum, tarea) => {
+              setProyectoSeleccionado(p);
+              setEtapaSeleccionada({ numero: etapaNum });
+              setTareaSeleccionada(tarea);
+              setPedidoSeleccionado(null);
+            }}
+            onEditarProyecto={(proy) => {
+              setProyectoEditando({ ...proy, tipo: 'proyecto' });
+              setShowModalProyectos(true);
+            }}
+            onEditarEtapa={(proy, etapaNum) => {
+              setProyectoEditando({ ...proy, tipo: 'etapa', etapa: etapaNum });
+              setShowModalProyectos(true);
+            }}
+            onAgregarTarea={(proy, etapaNum) => {
+              modalTareasProgramadasRef.current?.abrirProgramada({
+                id_proyecto: proy.id,
+                etapa: etapaNum,
+              });
+              setShowProgramadasModal(true);
+            }}
+            onEditarTarea={(tarea) => {
+              modalTareasProgramadasRef.current?.abrirProgramada(tarea);
+              setShowProgramadasModal(true);
+            }}
+            onEliminarTarea={(tarea) => {
+              // implementar si querés
+            }}
+            onEliminarProyecto={(proy) => {
+              // opcional
+            }}
+            onEliminarEtapa={(proy, etapaNum) => {
+              // opcional
+            }}
+          />
+                      ))}
+                </div>
+              )}
 
-{/* TÍTULO FIJO DE "PROYECTOS" */}
-<div style={{
-  position: 'sticky',
-  top: 0,
-  backgroundColor: '#2d3748',
-  zIndex: 10,
-  padding: '10px 0',
-  fontSize: '1.1rem',
-  color: '#a0aec0',
-  display: 'flex',
-  alignItems: 'center',
-  borderBottom: '1px solid #555',
-}}>
-  <i className="bi bi-journal-text me-2 ms-3"></i>Proyectos
 </div>
-
-    {/* DIFUMINADO justo debajo del título */}
-    <div style={{
-      position: 'sticky',
-      top: '30px', // ajustá si el título es más alto
-      height: '40px',
-      background: 'linear-gradient(to bottom, #2d3748, transparent)',
-      zIndex: 9,
-      pointerEvents: 'none',
-      marginTop: '-20px'
-    }} />
-
-
-    {[...proyectos]
-      .sort((a, b) => new Date(b.created_at) - new Date(a.created_at))
-      .map(proyecto => (
-                <TarjetaProyecto
-  key={proyecto.id}
-  proyecto={proyecto}
-  tareas={tareasPorProyecto[proyecto.id] || []}
-  onSeleccionarProyecto={(proy) => console.log("Proyecto:", proy)}
-  onSeleccionarEtapa={(proy, etapaNum) => console.log("Etapa:", etapaNum, "de", proy.nombre)}
-  onSeleccionarTarea={(proy, etapaNum, tarea) => console.log("Tarea:", tarea, "de etapa", etapaNum)}
-/>
-    ))}
-
-  </div>
-</div>
-</div>
+            
+            </div>
+          </div>
+        </div>
       </div>
     </div>
   );
